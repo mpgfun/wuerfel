@@ -53,7 +53,6 @@ pub fn start(canvas: HtmlCanvasElement) {
 }
 
 fn start_render_loop(
-    // mut rx: UnboundedReceiver<Vec<u8>>,
     state: Rc<RefCell<ClientGameState>>,
     socket: WebSocket,
 ) {
