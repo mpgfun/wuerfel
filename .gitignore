@@ -1,0 +1,6 @@
+web/pkg
+game/client/target
+game/server/target
+game/shared/target
+game/target
+.vscode
