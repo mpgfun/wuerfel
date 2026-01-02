@@ -1,7 +1,9 @@
 use crate::net::readwrite::{StreamRead, StreamWrite};
 
 impl StreamRead for bool {
-    fn read(reader: &mut impl crate::net::readwrite::ByteReader) -> Result<Self, crate::net::readwrite::StreamReadError> {
+    fn read(
+        reader: &mut impl crate::net::readwrite::ByteReader,
+    ) -> Result<Self, crate::net::readwrite::StreamReadError> {
         Ok(reader.try_read_byte()? != 0)
     }
 }

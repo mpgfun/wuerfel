@@ -1,7 +1,9 @@
 use crate::net::readwrite::{StreamRead, StreamWrite};
 
 impl<T: StreamRead> StreamRead for Option<T> {
-    fn read(reader: &mut impl crate::net::readwrite::ByteReader) -> Result<Self, crate::net::readwrite::StreamReadError> {
+    fn read(
+        reader: &mut impl crate::net::readwrite::ByteReader,
+    ) -> Result<Self, crate::net::readwrite::StreamReadError> {
         let is_some: bool = reader.try_read()?;
         if is_some {
             Ok(Some(reader.try_read()?))

@@ -39,6 +39,10 @@ pub trait ByteWriter: Sized {
     fn write_ref<T: StreamWrite>(&mut self, value: &T) {
         value.write(self);
     }
+    #[inline]
+    fn write_packet_id(&mut self, id: u8) {
+        self.write(id);
+    }
 }
 
 pub enum StreamReadError {
