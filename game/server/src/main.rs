@@ -70,7 +70,7 @@ async fn handle_socket(mut socket: WebSocket, addr: SocketAddr) {
 fn process_message(message: Message, sender: &mut SplitSink<WebSocket, Message>, addr: SocketAddr) -> ControlFlow<Option<(u16, String)>> {
     match message {
         Message::Binary(data) => {
-            
+            // TODO read packet
             ControlFlow::Continue(())
         },
         _ => ControlFlow::Break(Some((1, String::from("Sent invalid data")))),
