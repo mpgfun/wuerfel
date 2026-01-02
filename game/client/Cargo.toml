@@ -23,3 +23,4 @@ web-sys = { version = "0.3.83", features = [
 ]}
 shared = { path = "../shared" }
 futures = "0.3.31"
+wasm-bindgen-futures = "0.4.56"

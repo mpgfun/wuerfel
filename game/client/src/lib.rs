@@ -1,10 +1,21 @@
-use std::{cell::RefCell, ops::ControlFlow, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
+use futures::{
+    StreamExt,
+    channel::mpsc::{self, UnboundedSender},
+};
 use wasm_bindgen::prelude::*;
-use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, MessageEvent, WebSocket, js_sys};
+use wasm_bindgen_futures::spawn_local;
+use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, window};
 
-use crate::net::{create_ws, decode_and_apply_packet};
+use crate::{
+    com::MpscMessage,
+    graphics::{RenderingInfo, render},
+    net::{create_ws, handle_mpsc_message},
+};
 
+mod com;
+mod graphics;
 mod net;
 
 #[wasm_bindgen]
@@ -21,19 +32,15 @@ macro_rules! console_log {
 }
 
 struct ClientGameState {
-    ctx: CanvasRenderingContext2d,
-    should_disconnect: bool,
+    should_close: bool,
+    color: u8,
 }
 
 impl ClientGameState {
-    pub fn render(&self) {
-        todo!()
-    }
-
-    pub fn new(ctx: CanvasRenderingContext2d) -> Self {
+    pub fn new() -> Self {
         Self {
-            ctx,
-            should_disconnect: false,
+            should_close: false,
+            color: 0,
         }
     }
 }
@@ -46,30 +53,40 @@ pub fn start(canvas: HtmlCanvasElement) {
         .unwrap()
         .dyn_into::<CanvasRenderingContext2d>()
         .unwrap();
-    let state = Rc::new(RefCell::new(ClientGameState::new(ctx)));
-    let socket = create_ws();
+    let rendering_info: RenderingInfo = RenderingInfo {
+        ctx,
+        width: canvas.width(),
+        height: canvas.height(),
+    };
+    let (tx, mut rx) = mpsc::unbounded::<MpscMessage>();
+    let state = Rc::new(RefCell::new(ClientGameState::new()));
+    let ws = create_ws();
+    let mut cloned_ws = ws.clone();
+    let cloned_state = state.clone();
+    spawn_local(async move {
+        while let Some(msg) = rx.next().await {
+            handle_mpsc_message(msg, &mut cloned_ws, cloned_state.clone());
+        }
+    });
 
-    start_render_loop(state, socket);
+    start_render_loop(rendering_info, state, tx);
 }
 
 fn start_render_loop(
+    mut rendering_info: RenderingInfo,
     state: Rc<RefCell<ClientGameState>>,
-    socket: WebSocket,
+    tx: UnboundedSender<MpscMessage>,
 ) {
-    let mut socket_cloned = socket.clone();
-    let onmessage = Closure::<dyn FnMut(MessageEvent)>::new(move |event: web_sys::MessageEvent| {
-        if let Ok(buffer) = event.data().dyn_into::<js_sys::ArrayBuffer>() {
-            let bytes = js_sys::Uint8Array::new(&buffer).to_vec();
-            match decode_and_apply_packet(state.borrow_mut(), bytes, &mut socket_cloned) {
-                ControlFlow::Break(_) => {
-                    console_log!("controlflow break");
-                }
-                ControlFlow::Continue(_) => {
-                    console_log!("controlflow continue");
-                }
-            }
-        }
-    });
-    socket.set_onmessage(Some(onmessage.as_ref().unchecked_ref()));
-    onmessage.forget();
+    tx.unbounded_send(MpscMessage::CreateOnMessage).unwrap();
+    let interval_callback = Closure::wrap(Box::new(move || {
+        render(&mut rendering_info, state.clone());
+    }) as Box<dyn FnMut()>);
+    let _timeout = window()
+        .unwrap()
+        .set_interval_with_callback_and_timeout_and_arguments_0(
+            interval_callback.as_ref().unchecked_ref(),
+            1000,
+        )
+        .unwrap();
+    interval_callback.forget();
 }

@@ -11,7 +11,7 @@ use axum_extra::{TypedHeader, headers};
 use futures_util::{SinkExt, StreamExt, stream::SplitSink};
 use shared::net::{
     packets::C2SPacket,
-    readwrite::{ByteReader, ByteWriter},
+    readwrite::{ByteReader, ByteWriter, StreamRead},
 };
 
 use crate::{

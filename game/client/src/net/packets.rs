@@ -1,4 +1,4 @@
-use std::ops::ControlFlow;
+use std::{cell::RefCell, ops::ControlFlow, rc::Rc};
 
 use shared::net::{packets::join_response::JoinResponseS2CPacket, readwrite::StreamWrite};
 use web_sys::WebSocket;
@@ -26,7 +26,7 @@ impl<'a> Sender<'a> {
 pub trait ClientPacketHandler {
     fn apply(
         &self,
-        state: std::cell::RefMut<ClientGameState>,
+        state: Rc<RefCell<ClientGameState>>,
         socket: &mut WebSocket,
     ) -> ControlFlow<(), ()>;
 }
@@ -34,7 +34,7 @@ pub trait ClientPacketHandler {
 impl ClientPacketHandler for JoinResponseS2CPacket {
     fn apply(
         &self,
-        _state: std::cell::RefMut<ClientGameState>,
+        _state: Rc<RefCell<ClientGameState>>,
         _socket: &mut WebSocket,
     ) -> ControlFlow<(), ()> {
         if !self.may_join {
