@@ -1,7 +1,7 @@
 use crate::net::readwrite::{StreamRead, StreamWrite};
 
 pub struct JoinC2SPacket {
-    lobby_id: i32,
+    pub lobby_id: i32,
 }
 
 impl StreamRead for JoinC2SPacket {
