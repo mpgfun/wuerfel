@@ -43,7 +43,7 @@ impl GameSnapshotExt for GameSnapshot {
         };
         self.players.insert(
             player_id,
-            (format!("Player #{}", player_id), String::from("#ff0000")),
+            (format!("Player {}", player_id), String::from("#ff0000")),
         );
         self.squares.insert(
             starting_square,

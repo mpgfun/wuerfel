@@ -9,6 +9,7 @@ use axum_extra::{TypedHeader, headers};
 use rand::random;
 use shared::net::primitives::{
     game_snapshot::GameSnapshot, map_config::MapConfiguration, numbers::PlayerID,
+    position::Position,
 };
 use tower_http::services::ServeDir;
 
@@ -32,6 +33,20 @@ impl ServerGameState {
                 size_x: 100,
                 size_y: 100,
             },
+        }
+    }
+
+    pub fn remove_player(&mut self, id: PlayerID) {
+        self.connected_clients.remove(&id);
+        self.snapshot.players.remove(&id);
+        let mut squares_to_remove = Vec::<Position>::new();
+        for (pos, sq) in &self.snapshot.squares {
+            if sq.owner == id {
+                squares_to_remove.push(*pos);
+            }
+        }
+        for pos in squares_to_remove {
+            self.snapshot.remove_square(pos);
         }
     }
 }

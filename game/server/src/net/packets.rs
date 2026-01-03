@@ -52,7 +52,7 @@ pub trait ServerPacketSocketAddrHandler {
         sender: &mut Sender<'_>,
         server_state: Arc<Mutex<ServerGameState>>,
         addr: SocketAddr,
-    ) -> ControlFlow<Option<(u16, String)>>;
+    ) -> ControlFlow<Option<(u16, String)>, PlayerID>;
 }
 
 impl ServerPacketSocketAddrHandler for JoinC2SPacket {
@@ -61,16 +61,16 @@ impl ServerPacketSocketAddrHandler for JoinC2SPacket {
         sender: &mut Sender<'_>,
         server_state: Arc<Mutex<ServerGameState>>,
         addr: SocketAddr,
-    ) -> ControlFlow<Option<(u16, String)>> {
+    ) -> ControlFlow<Option<(u16, String)>, PlayerID> {
         let player_id = generate_player_id();
         let mut guard = server_state.lock().await;
         guard.connected_clients.insert(player_id, addr);
-        let snapshot_clone = guard.snapshot.clone();
         let map_config_copy = guard.map_config;
         let flow = guard
             .snapshot
             .spawn_new_player(player_id, map_config_copy)
             .await;
+        let snapshot_clone = guard.snapshot.clone();
         // unlock early
         drop(guard);
         if flow.is_continue() {
@@ -86,6 +86,6 @@ impl ServerPacketSocketAddrHandler for JoinC2SPacket {
         } else {
             sender.send(JoinResponseS2CPacket { data: None }).await;
         }
-        ControlFlow::Continue(())
+        ControlFlow::Continue(player_id)
     }
 }

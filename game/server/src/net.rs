@@ -11,6 +11,7 @@ use axum_extra::{TypedHeader, headers};
 use futures_util::{SinkExt, StreamExt, stream::SplitSink};
 use shared::net::{
     packets::C2SPacket,
+    primitives::numbers::PlayerID,
     readwrite::{ByteReader, ByteWriter, StreamRead},
 };
 
@@ -75,7 +76,7 @@ async fn process_message(
     sender: &mut SplitSink<WebSocket, Message>,
     addr: SocketAddr,
     server_state: Arc<tokio::sync::Mutex<ServerGameState>>,
-) -> ControlFlow<Option<(u16, String)>> {
+) -> ControlFlow<Option<(u16, String)>, Option<PlayerID>> {
     match message {
         Message::Binary(data) => {
             let mut reader = ServerByteReader::new(data.to_vec());
@@ -88,9 +89,13 @@ async fn process_message(
             };
             match packet {
                 C2SPacket::Join(packet) => {
-                    packet
+                    match packet
                         .handle(&mut Sender::new(sender), server_state, addr)
                         .await
+                    {
+                        ControlFlow::Break(v) => ControlFlow::Break(v),
+                        ControlFlow::Continue(id) => ControlFlow::Continue(Some(id)),
+                    }
                 }
             }
         }
@@ -104,27 +109,39 @@ async fn handle_socket(
     server_state: Arc<tokio::sync::Mutex<ServerGameState>>,
 ) {
     let (mut sender, mut receiver) = socket.split();
+    let mut player_id: Option<PlayerID> = None;
 
     loop {
         if let Some(message) = receiver.next().await {
             let Ok(message) = message else {
                 return;
             };
-            if let ControlFlow::Break(close) =
-                process_message(message, &mut sender, addr, Arc::clone(&server_state)).await
-            {
-                if let Some(close) = close {
-                    if let Err(e) = sender
-                        .send(Message::Close(Some(CloseFrame {
-                            code: close.0,
-                            reason: Utf8Bytes::from(close.1),
-                        })))
-                        .await
-                    {
-                        println!("Error sending close message to {addr}: {e}");
+            let processed =
+                process_message(message, &mut sender, addr, Arc::clone(&server_state)).await;
+            match processed {
+                ControlFlow::Break(close) => {
+                    if let Some(close) = close {
+                        if let Some(id) = player_id {
+                            let mut guard = server_state.lock().await;
+                            guard.remove_player(id);
+                        }
+                        if let Err(e) = sender
+                            .send(Message::Close(Some(CloseFrame {
+                                code: close.0,
+                                reason: Utf8Bytes::from(close.1),
+                            })))
+                            .await
+                        {
+                            println!("Error sending close message to {addr}: {e}");
+                        }
+                    }
+                    return;
+                }
+                ControlFlow::Continue(maybe_id) => {
+                    if let Some(id) = maybe_id {
+                        player_id = Some(id);
                     }
                 }
-                return;
             }
         }
     }
