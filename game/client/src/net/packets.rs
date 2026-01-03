@@ -3,7 +3,7 @@ use std::{cell::RefCell, ops::ControlFlow, rc::Rc};
 use shared::net::{packets::join_response::JoinResponseS2CPacket, readwrite::StreamWrite};
 use web_sys::WebSocket;
 
-use crate::{ClientGameState, net::ClientByteWriter};
+use crate::{ClientGame, ClientState, console_log, net::ClientByteWriter};
 
 pub struct Sender<'a> {
     ws: &'a mut WebSocket,
@@ -24,22 +24,35 @@ impl<'a> Sender<'a> {
 }
 
 pub trait ClientPacketHandler {
+    fn apply(self, state: Rc<RefCell<ClientState>>, socket: &mut WebSocket) -> ControlFlow<(), ()>;
+}
+
+#[allow(unused)]
+pub trait ClientPacketHandlerBorrow {
+    fn apply(&self, state: Rc<RefCell<ClientState>>, socket: &mut WebSocket)
+    -> ControlFlow<(), ()>;
+}
+#[allow(unused)]
+pub trait ClientPacketHandlerBorrowMut {
     fn apply(
-        &self,
-        state: Rc<RefCell<ClientGameState>>,
+        &mut self,
+        state: Rc<RefCell<ClientState>>,
         socket: &mut WebSocket,
     ) -> ControlFlow<(), ()>;
 }
 
 impl ClientPacketHandler for JoinResponseS2CPacket {
     fn apply(
-        &self,
-        _state: Rc<RefCell<ClientGameState>>,
+        self,
+        state: Rc<RefCell<ClientState>>,
         _socket: &mut WebSocket,
     ) -> ControlFlow<(), ()> {
-        if !self.may_join {
+        let Some(data) = self.data else {
+            state.borrow_mut().should_close = true;
             return ControlFlow::Break(());
-        }
+        };
+        console_log!("Data from join: {:?}", data);
+        state.borrow_mut().game = Some(ClientGame::new(data));
         ControlFlow::Continue(())
     }
 }

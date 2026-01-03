@@ -1,14 +1,39 @@
 use crate::net::{
-    primitives::{numbers::PlayerID, position::Position},
+    primitives::{game_snapshot::GameSnapshot, map_config::MapConfiguration, numbers::PlayerID},
     readwrite::{StreamRead, StreamWrite},
 };
 
 #[derive(Debug)]
+pub struct JoinResponseS2CPacketData {
+    pub player_id: PlayerID,
+    pub snapshot: GameSnapshot,
+    pub map_config: MapConfiguration,
+}
+
+impl StreamRead for JoinResponseS2CPacketData {
+    fn read(
+        reader: &mut impl crate::net::readwrite::ByteReader,
+    ) -> Result<Self, crate::net::readwrite::StreamReadError> {
+        Ok(Self {
+            player_id: reader.try_read()?,
+            snapshot: reader.try_read()?,
+            map_config: reader.try_read()?,
+        })
+    }
+}
+
+impl StreamWrite for JoinResponseS2CPacketData {
+    fn write(&self, writer: &mut impl crate::net::readwrite::ByteWriter) {
+        self.player_id.write(writer);
+        self.snapshot.write(writer);
+        self.map_config.write(writer);
+    }
+}
+
+#[derive(Debug)]
 pub struct JoinResponseS2CPacket {
-    /// If this is false, all other fields will be `None`, otherwise they will be `Some(...)`
-    pub may_join: bool,
-    pub player_id: Option<PlayerID>,
-    pub position: Option<Position>,
+    /// If this is `None`, the player may not join.
+    pub data: Option<JoinResponseS2CPacketData>,
 }
 
 impl StreamRead for JoinResponseS2CPacket {
@@ -16,9 +41,7 @@ impl StreamRead for JoinResponseS2CPacket {
         reader: &mut impl crate::net::readwrite::ByteReader,
     ) -> Result<Self, crate::net::readwrite::StreamReadError> {
         Ok(Self {
-            may_join: reader.try_read()?,
-            player_id: reader.try_read()?,
-            position: reader.try_read()?,
+            data: reader.try_read()?,
         })
     }
 }
@@ -26,8 +49,6 @@ impl StreamRead for JoinResponseS2CPacket {
 impl StreamWrite for JoinResponseS2CPacket {
     fn write(&self, writer: &mut impl crate::net::readwrite::ByteWriter) {
         writer.write_packet_id(1);
-        writer.write(self.may_join);
-        writer.write(self.player_id);
-        writer.write(self.position);
+        self.data.write(writer);
     }
 }

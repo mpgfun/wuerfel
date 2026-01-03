@@ -7,7 +7,7 @@ use shared::net::{
 use wasm_bindgen::{JsCast, prelude::Closure};
 use web_sys::{MessageEvent, WebSocket, js_sys};
 
-use crate::{ClientGameState, com::MpscMessage, console_log, net::packets::ClientPacketHandler};
+use crate::{ClientState, com::MpscMessage, console_log, net::packets::ClientPacketHandler};
 
 pub use packets::Sender;
 
@@ -58,7 +58,7 @@ pub fn create_ws() -> WebSocket {
     ws
 }
 
-fn create_on_message(ws: WebSocket, state: Rc<RefCell<ClientGameState>>) {
+fn create_on_message(ws: WebSocket, state: Rc<RefCell<ClientState>>) {
     let ws_clone = ws.clone();
     let onmessage = Closure::<dyn FnMut(MessageEvent)>::new(move |event: MessageEvent| {
         let Ok(buffer) = event.data().dyn_into::<js_sys::ArrayBuffer>() else {
@@ -76,22 +76,14 @@ fn create_on_message(ws: WebSocket, state: Rc<RefCell<ClientGameState>>) {
     onmessage.forget();
 }
 
-pub fn handle_mpsc_message(
-    msg: MpscMessage,
-    ws: &mut WebSocket,
-    state: Rc<RefCell<ClientGameState>>,
-) {
+pub fn handle_mpsc_message(msg: MpscMessage, ws: &mut WebSocket, state: Rc<RefCell<ClientState>>) {
     match msg {
         MpscMessage::CreateOnMessage => create_on_message(ws.clone(), state),
-        MpscMessage::SendPacket(packet) => {
-            let mut sender = Sender::new(ws);
-            sender.send(packet);
-        }
     }
 }
 
 pub fn decode_and_apply_packet(
-    state: Rc<RefCell<ClientGameState>>,
+    state: Rc<RefCell<ClientState>>,
     received_bytes: Vec<u8>,
     socket: &mut WebSocket,
 ) -> ControlFlow<(), ()> {

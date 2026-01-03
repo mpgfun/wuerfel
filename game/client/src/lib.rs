@@ -4,6 +4,7 @@ use futures::{
     StreamExt,
     channel::mpsc::{self, UnboundedSender},
 };
+use shared::net::packets::join_response::JoinResponseS2CPacketData;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, window};
@@ -18,6 +19,8 @@ mod com;
 mod graphics;
 mod net;
 
+const FPS: i32 = 60;
+
 #[wasm_bindgen]
 unsafe extern "C" {
     #[wasm_bindgen(js_namespace = console)]
@@ -31,16 +34,27 @@ macro_rules! console_log {
     };
 }
 
-struct ClientGameState {
-    should_close: bool,
-    color: u8,
+struct ClientGame {
+    #[allow(unused)]
+    pub data: JoinResponseS2CPacketData,
 }
 
-impl ClientGameState {
+impl ClientGame {
+    pub fn new(data: JoinResponseS2CPacketData) -> Self {
+        Self { data }
+    }
+}
+
+struct ClientState {
+    should_close: bool,
+    game: Option<ClientGame>,
+}
+
+impl ClientState {
     pub fn new() -> Self {
         Self {
             should_close: false,
-            color: 0,
+            game: None,
         }
     }
 }
@@ -55,11 +69,12 @@ pub fn start(canvas: HtmlCanvasElement) {
         .unwrap();
     let rendering_info: RenderingInfo = RenderingInfo {
         ctx,
+        canvas: canvas.clone(),
         width: canvas.width(),
         height: canvas.height(),
     };
     let (tx, mut rx) = mpsc::unbounded::<MpscMessage>();
-    let state = Rc::new(RefCell::new(ClientGameState::new()));
+    let state = Rc::new(RefCell::new(ClientState::new()));
     let ws = create_ws();
     let mut cloned_ws = ws.clone();
     let cloned_state = state.clone();
@@ -74,7 +89,7 @@ pub fn start(canvas: HtmlCanvasElement) {
 
 fn start_render_loop(
     mut rendering_info: RenderingInfo,
-    state: Rc<RefCell<ClientGameState>>,
+    state: Rc<RefCell<ClientState>>,
     tx: UnboundedSender<MpscMessage>,
 ) {
     tx.unbounded_send(MpscMessage::CreateOnMessage).unwrap();
@@ -85,7 +100,7 @@ fn start_render_loop(
         .unwrap()
         .set_interval_with_callback_and_timeout_and_arguments_0(
             interval_callback.as_ref().unchecked_ref(),
-            1000,
+            1000 / FPS,
         )
         .unwrap();
     interval_callback.forget();

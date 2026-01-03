@@ -1,13 +1,13 @@
 use crate::net::readwrite::{StreamRead, StreamWrite};
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Position {
-    pub x: i32,
-    pub y: i32,
+    pub x: u32,
+    pub y: u32,
 }
 
 impl Position {
-    pub fn new(x: i32, y: i32) -> Self {
+    pub fn new(x: u32, y: u32) -> Self {
         Self { x, y }
     }
 }

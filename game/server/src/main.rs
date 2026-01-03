@@ -6,21 +6,32 @@ use axum::{
     routing::any,
 };
 use axum_extra::{TypedHeader, headers};
-use shared::net::primitives::numbers::PlayerID;
+use rand::random;
+use shared::net::primitives::{
+    game_snapshot::GameSnapshot, map_config::MapConfiguration, numbers::PlayerID,
+};
 use tower_http::services::ServeDir;
 
 use crate::net::ws_handler;
 
+mod game;
 mod net;
 
 struct ServerGameState {
     connected_clients: HashMap<PlayerID, SocketAddr>,
+    snapshot: GameSnapshot,
+    map_config: MapConfiguration,
 }
 
 impl ServerGameState {
     pub fn new() -> Self {
         Self {
             connected_clients: HashMap::new(),
+            snapshot: GameSnapshot::new(),
+            map_config: MapConfiguration {
+                size_x: 100,
+                size_y: 100,
+            },
         }
     }
 }
@@ -52,4 +63,8 @@ async fn main() {
     {
         println!("Error serving: {}", e);
     }
+}
+
+fn generate_player_id() -> PlayerID {
+    random()
 }

@@ -1,4 +1,10 @@
 pub mod bool;
+pub mod color;
+pub mod game_snapshot;
+pub mod map_config;
 pub mod numbers;
 pub mod option;
 pub mod position;
+pub mod square;
+pub mod string;
+pub mod vec;

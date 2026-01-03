@@ -10,3 +10,4 @@ tower-http = { version = "0.6.8", features = ["fs"] }
 shared = { path = "../shared" }
 axum-extra = { version = "0.12.5", features = ["typed-header"] }
 futures-util = { version = "0.3.31", default-features = false, features = ["std", "sink"] }
+rand = "0.9.2"

@@ -6,13 +6,16 @@ use axum::{
 };
 use futures_util::{SinkExt, stream::SplitSink};
 use shared::net::{
-    packets::{join::JoinC2SPacket, join_response::JoinResponseS2CPacket},
-    primitives::{numbers::PlayerID, position::Position},
+    packets::{
+        join::JoinC2SPacket,
+        join_response::{JoinResponseS2CPacket, JoinResponseS2CPacketData},
+    },
+    primitives::numbers::PlayerID,
     readwrite::StreamWrite,
 };
 use tokio::sync::Mutex;
 
-use crate::{ServerGameState, net::ServerByteWriter};
+use crate::{ServerGameState, game::GameSnapshotExt, generate_player_id, net::ServerByteWriter};
 
 pub struct Sender<'a> {
     sender: &'a mut SplitSink<WebSocket, Message>,
@@ -33,6 +36,7 @@ impl<'a> Sender<'a> {
     }
 }
 
+#[allow(unused)]
 pub trait ServerPacketHandler {
     async fn handle(
         &self,
@@ -58,18 +62,30 @@ impl ServerPacketSocketAddrHandler for JoinC2SPacket {
         server_state: Arc<Mutex<ServerGameState>>,
         addr: SocketAddr,
     ) -> ControlFlow<Option<(u16, String)>> {
-        dbg!(self);
+        let player_id = generate_player_id();
         let mut guard = server_state.lock().await;
-        guard.connected_clients.insert(1234, addr);
+        guard.connected_clients.insert(player_id, addr);
+        let snapshot_clone = guard.snapshot.clone();
+        let map_config_copy = guard.map_config;
+        let flow = guard
+            .snapshot
+            .spawn_new_player(player_id, map_config_copy)
+            .await;
         // unlock early
         drop(guard);
-        sender
-            .send(JoinResponseS2CPacket {
-                may_join: true,
-                player_id: Some(1234),
-                position: Some(Position::new(123, 456)),
-            })
-            .await;
+        if flow.is_continue() {
+            sender
+                .send(JoinResponseS2CPacket {
+                    data: Some(JoinResponseS2CPacketData {
+                        player_id: player_id,
+                        snapshot: snapshot_clone,
+                        map_config: map_config_copy,
+                    }),
+                })
+                .await;
+        } else {
+            sender.send(JoinResponseS2CPacket { data: None }).await;
+        }
         ControlFlow::Continue(())
     }
 }

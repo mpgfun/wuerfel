@@ -63,3 +63,43 @@ impl StreamWrite for u64 {
         writer.write_multiple_bytes(&self.to_be_bytes());
     }
 }
+
+impl StreamRead for u32 {
+    #[inline]
+    fn read(
+        reader: &mut impl crate::net::readwrite::ByteReader,
+    ) -> Result<Self, crate::net::readwrite::StreamReadError> {
+        Ok(Self::from_be_bytes([
+            reader.try_read()?,
+            reader.try_read()?,
+            reader.try_read()?,
+            reader.try_read()?,
+        ]))
+    }
+}
+
+impl StreamWrite for u32 {
+    #[inline]
+    fn write(&self, writer: &mut impl crate::net::readwrite::ByteWriter) {
+        writer.write_multiple_bytes(&self.to_be_bytes());
+    }
+}
+
+impl StreamRead for u16 {
+    #[inline]
+    fn read(
+        reader: &mut impl crate::net::readwrite::ByteReader,
+    ) -> Result<Self, crate::net::readwrite::StreamReadError> {
+        Ok(Self::from_be_bytes([
+            reader.try_read()?,
+            reader.try_read()?,
+        ]))
+    }
+}
+
+impl StreamWrite for u16 {
+    #[inline]
+    fn write(&self, writer: &mut impl crate::net::readwrite::ByteWriter) {
+        writer.write_multiple_bytes(&self.to_be_bytes());
+    }
+}
