@@ -125,14 +125,15 @@ async fn handle_socket(
                             let mut guard = server_state.lock().await;
                             guard.remove_player(id);
                         }
-                        if let Err(e) = sender
+                        if let Err(_e) = sender
                             .send(Message::Close(Some(CloseFrame {
                                 code: close.0,
                                 reason: Utf8Bytes::from(close.1),
                             })))
                             .await
                         {
-                            println!("Error sending close message to {addr}: {e}");
+                            // error likely means that the socket was already closed
+                            // println!("Error sending close message to {addr}: {e}");
                         }
                     }
                     return;
