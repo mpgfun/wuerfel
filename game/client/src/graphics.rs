@@ -1,18 +1,31 @@
-use std::{cell::RefCell, rc::Rc};
-
 use wasm_bindgen::JsCast;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, js_sys::Number, window};
 
-use crate::{ClientGame, ClientState};
+use crate::{
+    ClientGame, ClientState,
+    graphics::zoom_handler::{reset_transformation, transform_zoom},
+};
 
+mod zoom_handler;
+
+#[derive(Clone)]
 pub struct RenderingInfo {
     pub ctx: CanvasRenderingContext2d,
     pub canvas: HtmlCanvasElement,
     pub width: u32,
     pub height: u32,
+    pub camera_zoom: f64,
+    pub camera_position: (f64, f64),
 }
 
-pub fn render(info: &mut RenderingInfo, state: Rc<RefCell<ClientState>>) {
+pub fn render(info: &RenderingInfo, state: &ClientState) {
+    match &state.game {
+        None => draw_loading_screen(info),
+        Some(game) => draw_game(info, game, state),
+    }
+}
+
+pub fn resize(info: &mut RenderingInfo) {
     info.canvas.set_width(
         window()
             .unwrap()
@@ -34,37 +47,30 @@ pub fn render(info: &mut RenderingInfo, state: Rc<RefCell<ClientState>>) {
 
     info.width = info.canvas.width();
     info.height = info.canvas.height();
-
-    let state_ref = state.borrow();
-    match &state_ref.game {
-        None => draw_loading_screen(info),
-        Some(game) => draw_game(info, game, state.clone()),
-    }
 }
 
-fn background(info: &mut RenderingInfo, color: &str) {
+fn background(info: &RenderingInfo, color: &str) {
     info.ctx.set_fill_style_str(color);
     info.ctx
         .fill_rect(0.0, 0.0, info.width as f64, info.height as f64);
 }
 
-fn draw_loading_screen(info: &mut RenderingInfo) {
-    background(info, "#000000");
+fn draw_loading_screen(info: &RenderingInfo) {
+    background(&info, "#000000");
     info.ctx.set_fill_style_str("#ffffff");
     info.ctx.set_font("30px Arial");
     info.ctx.set_text_baseline("middle");
     info.ctx.set_text_align("center");
-    info.ctx
-        .fill_text(
-            "Loading...",
-            (info.width / 2) as f64,
-            (info.height / 2) as f64,
-        )
-        .unwrap();
+    let _ = info.ctx.fill_text(
+        "Loading...",
+        (info.width / 2) as f64,
+        (info.height / 2) as f64,
+    );
 }
 
-fn draw_game(info: &mut RenderingInfo, game: &ClientGame, _state: Rc<RefCell<ClientState>>) {
-    background(info, "#ffffff");
+fn draw_game(info: &RenderingInfo, game: &ClientGame, _state: &ClientState) {
+    transform_zoom(&info);
+    background(&info, "#ffffff");
     let square_size_x = info.width / game.data.map_config.size_x;
     let square_size_y = info.height / game.data.map_config.size_y;
     for (pos, square) in &game.data.snapshot.squares {
@@ -79,5 +85,14 @@ fn draw_game(info: &mut RenderingInfo, game: &ClientGame, _state: Rc<RefCell<Cli
             square_size_x as f64,
             square_size_y as f64,
         );
+    }
+    reset_transformation(&info);
+}
+
+pub fn update_zoom(info: &mut RenderingInfo, delta: f64) {
+    if delta < 0.0 {
+        info.camera_zoom -= 1.0;
+    } else if delta > 0.0 {
+        info.camera_zoom += 1.0;
     }
 }

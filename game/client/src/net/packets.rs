@@ -1,58 +1,23 @@
-use std::{cell::RefCell, ops::ControlFlow, rc::Rc};
+use std::ops::ControlFlow;
 
-use shared::net::{packets::join_response::JoinResponseS2CPacket, readwrite::StreamWrite};
-use web_sys::WebSocket;
+use futures::channel::mpsc::UnboundedSender;
+use shared::net::packets::join_response::JoinResponseS2CPacket;
 
-use crate::{ClientGame, ClientState, console_log, net::ClientByteWriter};
-
-pub struct Sender<'a> {
-    ws: &'a mut WebSocket,
-}
-
-impl<'a> Sender<'a> {
-    pub fn new(ws: &'a mut WebSocket) -> Self {
-        Self { ws }
-    }
-
-    pub fn send<T: StreamWrite>(&mut self, packet: T) {
-        let mut writer = ClientByteWriter::new();
-        packet.write(&mut writer);
-        self.ws
-            .send_with_u8_array(writer.destroy().as_slice())
-            .unwrap();
-    }
-}
+use crate::{ClientGame, com::MpscMessage, console_log};
 
 pub trait ClientPacketHandler {
-    fn apply(self, state: Rc<RefCell<ClientState>>, socket: &mut WebSocket) -> ControlFlow<(), ()>;
-}
-
-#[allow(unused)]
-pub trait ClientPacketHandlerBorrow {
-    fn apply(&self, state: Rc<RefCell<ClientState>>, socket: &mut WebSocket)
-    -> ControlFlow<(), ()>;
-}
-#[allow(unused)]
-pub trait ClientPacketHandlerBorrowMut {
-    fn apply(
-        &mut self,
-        state: Rc<RefCell<ClientState>>,
-        socket: &mut WebSocket,
-    ) -> ControlFlow<(), ()>;
+    fn apply(self, tx: UnboundedSender<MpscMessage>) -> ControlFlow<(), ()>;
 }
 
 impl ClientPacketHandler for JoinResponseS2CPacket {
-    fn apply(
-        self,
-        state: Rc<RefCell<ClientState>>,
-        _socket: &mut WebSocket,
-    ) -> ControlFlow<(), ()> {
+    fn apply(self, tx: UnboundedSender<MpscMessage>) -> ControlFlow<(), ()> {
         let Some(data) = self.data else {
-            state.borrow_mut().should_close = true;
             return ControlFlow::Break(());
         };
         console_log!("Data from join: {:?}", data);
-        state.borrow_mut().game = Some(ClientGame::new(data));
+        let _ = tx.unbounded_send(MpscMessage::MutateClientState(Box::new(|state| {
+            state.game = Some(ClientGame::new(data));
+        })));
         ControlFlow::Continue(())
     }
 }

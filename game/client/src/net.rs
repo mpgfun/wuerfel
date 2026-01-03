@@ -1,15 +1,17 @@
-use std::{cell::RefCell, ops::ControlFlow, rc::Rc, vec::IntoIter};
+use std::{ops::ControlFlow, vec::IntoIter};
 
+use futures::channel::mpsc::UnboundedSender;
 use shared::net::{
-    packets::{S2CPacket, join::JoinC2SPacket},
+    packets::S2CPacket,
     readwrite::{ByteReader, ByteWriter, StreamRead},
 };
 use wasm_bindgen::{JsCast, prelude::Closure};
-use web_sys::{MessageEvent, WebSocket, js_sys};
+use web_sys::{
+    MessageEvent, WebSocket,
+    js_sys::{ArrayBuffer, Uint8Array},
+};
 
-use crate::{ClientState, com::MpscMessage, console_log, net::packets::ClientPacketHandler};
-
-pub use packets::Sender;
+use crate::{com::MpscMessage, console_log, log_js_err, net::packets::ClientPacketHandler};
 
 mod packets;
 
@@ -45,47 +47,32 @@ impl ByteWriter for ClientByteWriter {
     }
 }
 
-pub fn create_ws() -> WebSocket {
-    let ws = WebSocket::new("/ws").unwrap();
+pub fn create_ws(tx: UnboundedSender<MpscMessage>) -> Option<WebSocket> {
+    let ws = match WebSocket::new("/ws") {
+        Ok(ws) => ws,
+        Err(e) => {
+            log_js_err!(e);
+            return None;
+        }
+    };
     ws.set_binary_type(web_sys::BinaryType::Arraybuffer);
-    let mut cloned_ws = ws.clone();
+    let cloned_tx = tx.clone();
     let onopen = Closure::<dyn FnMut()>::new(move || {
-        let mut sender = Sender::new(&mut cloned_ws);
-        sender.send(JoinC2SPacket { lobby_id: 123 });
+        let _ = cloned_tx.unbounded_send(MpscMessage::SocketOpened);
     });
     ws.set_onopen(Some(onopen.as_ref().unchecked_ref()));
     onopen.forget();
-    ws
-}
-
-fn create_on_message(ws: WebSocket, state: Rc<RefCell<ClientState>>) {
-    let ws_clone = ws.clone();
-    let onmessage = Closure::<dyn FnMut(MessageEvent)>::new(move |event: MessageEvent| {
-        let Ok(buffer) = event.data().dyn_into::<js_sys::ArrayBuffer>() else {
-            return;
-        };
-        if let ControlFlow::Break(_) = decode_and_apply_packet(
-            state.clone(),
-            js_sys::Uint8Array::new(&buffer).to_vec(),
-            &mut ws_clone.clone(),
-        ) {
-            state.borrow_mut().should_close = true;
-        }
+    let onmessage = Closure::<dyn FnMut(MessageEvent)>::new(move |event| {
+        let _ = tx.unbounded_send(MpscMessage::WebSocketMessage(event));
     });
     ws.set_onmessage(Some(onmessage.as_ref().unchecked_ref()));
     onmessage.forget();
-}
-
-pub fn handle_mpsc_message(msg: MpscMessage, ws: &mut WebSocket, state: Rc<RefCell<ClientState>>) {
-    match msg {
-        MpscMessage::CreateOnMessage => create_on_message(ws.clone(), state),
-    }
+    Some(ws)
 }
 
 pub fn decode_and_apply_packet(
-    state: Rc<RefCell<ClientState>>,
     received_bytes: Vec<u8>,
-    socket: &mut WebSocket,
+    tx: UnboundedSender<MpscMessage>,
 ) -> ControlFlow<(), ()> {
     let mut stream_reader = ClientByteReader::new(received_bytes);
     let packet = match S2CPacket::read(&mut stream_reader) {
@@ -97,6 +84,16 @@ pub fn decode_and_apply_packet(
     };
 
     match packet {
-        S2CPacket::JoinResponse(packet) => packet.apply(state, socket),
+        S2CPacket::JoinResponse(packet) => packet.apply(tx),
     }
+}
+
+pub fn handle_websocket_message_event(
+    event: MessageEvent,
+    tx: UnboundedSender<MpscMessage>,
+) -> ControlFlow<(), ()> {
+    let Ok(buffer) = event.data().dyn_into::<ArrayBuffer>() else {
+        return ControlFlow::Break(());
+    };
+    decode_and_apply_packet(Uint8Array::new(&buffer).to_vec(), tx)
 }

@@ -20,6 +20,9 @@ web-sys = { version = "0.3.83", features = [
     "ErrorEvent",
     "FileReader",
     "MessageEvent",
+    "HtmlElement",
+    "MouseEvent",
+    "WheelEvent",
 ]}
 shared = { path = "../shared" }
 futures = "0.3.31"

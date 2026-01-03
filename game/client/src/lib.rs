@@ -1,18 +1,15 @@
-use std::{cell::RefCell, rc::Rc};
-
-use futures::{
-    StreamExt,
-    channel::mpsc::{self, UnboundedSender},
+use futures::channel::mpsc::{self, UnboundedSender};
+use shared::net::packets::{
+    C2SPacket, join::JoinC2SPacket, join_response::JoinResponseS2CPacketData,
 };
-use shared::net::packets::join_response::JoinResponseS2CPacketData;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, window};
+use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, WheelEvent, window};
 
 use crate::{
-    com::MpscMessage,
-    graphics::{RenderingInfo, render},
-    net::{create_ws, handle_mpsc_message},
+    com::{MpscMessage, mpsc_receiver_loop},
+    graphics::RenderingInfo,
+    net::create_ws,
 };
 
 mod com;
@@ -34,6 +31,19 @@ macro_rules! console_log {
     };
 }
 
+#[macro_export]
+macro_rules! log_js_err {
+    ($err:expr) => {
+        console_log!(
+            "{}",
+            match $err.as_string() {
+                Some(s) => s,
+                None => String::from("<no error information available>"),
+            }
+        )
+    };
+}
+
 struct ClientGame {
     #[allow(unused)]
     pub data: JoinResponseS2CPacketData,
@@ -46,16 +56,12 @@ impl ClientGame {
 }
 
 struct ClientState {
-    should_close: bool,
     game: Option<ClientGame>,
 }
 
 impl ClientState {
     pub fn new() -> Self {
-        Self {
-            should_close: false,
-            game: None,
-        }
+        Self { game: None }
     }
 }
 
@@ -72,36 +78,47 @@ pub fn start(canvas: HtmlCanvasElement) {
         canvas: canvas.clone(),
         width: canvas.width(),
         height: canvas.height(),
+        camera_zoom: 1.0,
+        camera_position: (0.0, 0.0),
     };
-    let (tx, mut rx) = mpsc::unbounded::<MpscMessage>();
-    let state = Rc::new(RefCell::new(ClientState::new()));
-    let ws = create_ws();
-    let mut cloned_ws = ws.clone();
-    let cloned_state = state.clone();
-    spawn_local(async move {
-        while let Some(msg) = rx.next().await {
-            handle_mpsc_message(msg, &mut cloned_ws, cloned_state.clone());
-        }
-    });
-
-    start_render_loop(rendering_info, state, tx);
+    let (tx, rx) = mpsc::unbounded::<MpscMessage>();
+    register_event_handlers(canvas, tx.clone());
+    let state = ClientState::new();
+    let ws = create_ws(tx.clone());
+    let Some(ws) = ws else {
+        console_log!("Failed to create websocket");
+        return;
+    };
+    start_render_loop(tx.clone());
+    let _ = tx.unbounded_send(MpscMessage::SendPacket(C2SPacket::Join(JoinC2SPacket {
+        lobby_id: 0,
+    })));
+    spawn_local(mpsc_receiver_loop(rx, tx, ws, rendering_info, state));
 }
 
-fn start_render_loop(
-    mut rendering_info: RenderingInfo,
-    state: Rc<RefCell<ClientState>>,
-    tx: UnboundedSender<MpscMessage>,
-) {
-    tx.unbounded_send(MpscMessage::CreateOnMessage).unwrap();
+fn start_render_loop(tx: UnboundedSender<MpscMessage>) {
     let interval_callback = Closure::wrap(Box::new(move || {
-        render(&mut rendering_info, state.clone());
+        let _ = tx.unbounded_send(MpscMessage::Draw);
     }) as Box<dyn FnMut()>);
-    let _timeout = window()
+    let _timeout = match window()
         .unwrap()
         .set_interval_with_callback_and_timeout_and_arguments_0(
             interval_callback.as_ref().unchecked_ref(),
             1000 / FPS,
-        )
-        .unwrap();
+        ) {
+        Ok(timeout) => timeout,
+        Err(e) => {
+            log_js_err!(e);
+            return;
+        }
+    };
     interval_callback.forget();
+}
+
+fn register_event_handlers(canvas: HtmlCanvasElement, tx: UnboundedSender<MpscMessage>) {
+    let onwheel = Closure::wrap(Box::new(move |e: WheelEvent| {
+        let _ = tx.unbounded_send(MpscMessage::Scrolling(e.delta_y()));
+    }) as Box<dyn FnMut(WheelEvent)>);
+    canvas.set_onwheel(Some(onwheel.as_ref().unchecked_ref()));
+    onwheel.forget();
 }
