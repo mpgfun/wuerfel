@@ -63,6 +63,21 @@ fn draw_loading_screen(info: &mut RenderingInfo) {
         .unwrap();
 }
 
-fn draw_game(info: &mut RenderingInfo, _game: &ClientGame, _state: Rc<RefCell<ClientState>>) {
-    background(info, "#ff0000");
+fn draw_game(info: &mut RenderingInfo, game: &ClientGame, _state: Rc<RefCell<ClientState>>) {
+    background(info, "#ffffff");
+    let square_size_x = info.width / game.data.map_config.size_x;
+    let square_size_y = info.height / game.data.map_config.size_y;
+    for (pos, square) in &game.data.snapshot.squares {
+        let color = match game.data.snapshot.players.get(&square.owner) {
+            Some(player_data) => player_data.1.clone(),
+            None => String::from("#000000"),
+        };
+        info.ctx.set_fill_style_str(color.as_str());
+        info.ctx.fill_rect(
+            (square_size_x * pos.x) as f64,
+            (square_size_y * pos.y) as f64,
+            square_size_x as f64,
+            square_size_y as f64,
+        );
+    }
 }
