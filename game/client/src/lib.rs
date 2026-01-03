@@ -45,7 +45,6 @@ macro_rules! log_js_err {
 }
 
 struct ClientGame {
-    #[allow(unused)]
     pub data: JoinResponseS2CPacketData,
 }
 
