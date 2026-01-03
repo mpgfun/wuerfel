@@ -91,8 +91,10 @@ fn draw_game(info: &RenderingInfo, game: &ClientGame, _state: &ClientState) {
 
 pub fn update_zoom(info: &mut RenderingInfo, delta: f64) {
     if delta < 0.0 {
-        info.camera_zoom -= 1.0;
+        if info.camera_zoom > 1.0 {
+            info.camera_zoom -= 0.1;
+        }
     } else if delta > 0.0 {
-        info.camera_zoom += 1.0;
+        info.camera_zoom += 0.1;
     }
 }
