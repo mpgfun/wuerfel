@@ -4,7 +4,7 @@ use shared::net::packets::{
 };
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, WheelEvent, window};
+use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, MouseEvent, WheelEvent, window};
 
 use crate::{
     com::{MpscMessage, mpsc_receiver_loop},
@@ -114,11 +114,36 @@ fn start_render_loop(tx: UnboundedSender<MpscMessage>) {
     interval_callback.forget();
 }
 
-fn register_event_handlers(canvas: HtmlCanvasElement, tx: UnboundedSender<MpscMessage>) {
+fn register_event_handlers(canvas: HtmlCanvasElement, original_tx: UnboundedSender<MpscMessage>) {
+    let tx = original_tx.clone();
     let onwheel = Closure::wrap(Box::new(move |e: WheelEvent| {
         e.prevent_default();
         let _ = tx.unbounded_send(MpscMessage::Scrolling(e.delta_y()));
     }) as Box<dyn FnMut(WheelEvent)>);
-    canvas.set_onwheel(Some(onwheel.as_ref().unchecked_ref()));
+    let _ = canvas.add_event_listener_with_callback("wheel", onwheel.as_ref().unchecked_ref());
     onwheel.forget();
+
+    let tx = original_tx.clone();
+    let onmousedown = Closure::wrap(Box::new(move |_: MouseEvent| {
+        let _ = tx.unbounded_send(MpscMessage::MouseDown);
+    }) as Box<dyn FnMut(MouseEvent)>);
+    let _ =
+        canvas.add_event_listener_with_callback("mousedown", onmousedown.as_ref().unchecked_ref());
+    // canvas.set_onmousedown(Some(onmousedown.as_ref().unchecked_ref()));
+    onmousedown.forget();
+
+    let tx = original_tx.clone();
+    let onmouseup = Closure::wrap(Box::new(move |_: MouseEvent| {
+        let _ = tx.unbounded_send(MpscMessage::MouseUp);
+    }) as Box<dyn FnMut(MouseEvent)>);
+    let _ = canvas.add_event_listener_with_callback("mouseup", onmouseup.as_ref().unchecked_ref());
+    onmouseup.forget();
+
+    let tx = original_tx.clone();
+    let onmousemove = Closure::wrap(Box::new(move |e: MouseEvent| {
+        let _ = tx.unbounded_send(MpscMessage::MouseMove(e.client_x(), e.client_y()));
+    }) as Box<dyn FnMut(MouseEvent)>);
+    let _ =
+        canvas.add_event_listener_with_callback("mousemove", onmousemove.as_ref().unchecked_ref());
+    onmousemove.forget();
 }

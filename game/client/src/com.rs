@@ -20,6 +20,9 @@ pub enum MpscMessage {
     Scrolling(f64),
     Draw,
     MutateClientState(Box<dyn FnOnce(&mut ClientState)>),
+    MouseDown,
+    MouseUp,
+    MouseMove(i32, i32),
 }
 
 enum SocketStatus {
@@ -35,6 +38,8 @@ pub async fn mpsc_receiver_loop(
     mut state: ClientState,
 ) {
     let mut socket_status = SocketStatus::NotOpen(Vec::new());
+    let mut last_mouse_pos: Option<(f64, f64)> = None;
+    let mut is_mouse_down = false;
     while let Some(msg) = rx.next().await {
         match msg {
             MpscMessage::WebSocketMessage(event) => {
@@ -70,6 +75,22 @@ pub async fn mpsc_receiver_loop(
                 }
                 SocketStatus::NotOpen(queue) => queue.push(packet),
             },
+            MpscMessage::MouseMove(x, y) => {
+                let rect = info.canvas.get_bounding_client_rect();
+                let x = x as f64 - rect.x();
+                let y = y as f64 - rect.y();
+                if is_mouse_down {
+                    if let Some(some_last_mouse_pos) = last_mouse_pos {
+                        let delta_x = x - some_last_mouse_pos.0;
+                        let delta_y = y - some_last_mouse_pos.1;
+                        info.camera_position.0 += delta_x;
+                        info.camera_position.1 += delta_y;
+                    }
+                }
+                last_mouse_pos = Some((x, y));
+            }
+            MpscMessage::MouseDown => is_mouse_down = true,
+            MpscMessage::MouseUp => is_mouse_down = false,
         }
     }
 }
