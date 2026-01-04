@@ -1,12 +1,12 @@
 use wasm_bindgen::JsCast;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, js_sys::Number, window};
 
-use crate::{
-    ClientGame, ClientState,
-    graphics::zoom_handler::{reset_transformation, transform_zoom},
-};
+use crate::{ClientGame, ClientState, graphics::zoom_handler::transform_zoom};
 
 mod zoom_handler;
+
+const MIN_ZOOM: f64 = 0.5;
+const MAX_ZOOM: f64 = 3.0;
 
 #[derive(Clone)]
 pub struct RenderingInfo {
@@ -86,15 +86,17 @@ fn draw_game(info: &RenderingInfo, game: &ClientGame, _state: &ClientState) {
             square_size_y as f64,
         );
     }
-    reset_transformation(&info);
+    // reset_transformation(&info);
 }
 
 pub fn update_zoom(info: &mut RenderingInfo, delta: f64) {
     if delta < 0.0 {
-        if info.camera_zoom > 1.0 {
+        if info.camera_zoom > MIN_ZOOM {
             info.camera_zoom -= 0.1;
         }
     } else if delta > 0.0 {
-        info.camera_zoom += 0.1;
+        if info.camera_zoom < MAX_ZOOM {
+            info.camera_zoom += 0.1;
+        }
     }
 }

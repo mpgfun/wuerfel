@@ -2,7 +2,7 @@ use crate::{console_log, graphics::RenderingInfo, log_js_err};
 
 #[inline]
 pub fn transform_zoom(info: &RenderingInfo) {
-    if let Err(e) = info.ctx.transform(
+    if let Err(e) = info.ctx.set_transform(
         info.camera_zoom,
         0.0,
         0.0,
@@ -14,9 +14,9 @@ pub fn transform_zoom(info: &RenderingInfo) {
     }
 }
 
-#[inline]
-pub fn reset_transformation(info: &RenderingInfo) {
-    if let Err(e) = info.ctx.reset_transform() {
-        log_js_err!(e);
-    }
-}
+// #[inline]
+// pub fn reset_transformation(info: &RenderingInfo) {
+//     if let Err(e) = info.ctx.reset_transform() {
+//         log_js_err!(e);
+//     }
+// }
