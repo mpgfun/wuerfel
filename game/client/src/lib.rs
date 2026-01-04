@@ -79,6 +79,8 @@ pub fn start(canvas: HtmlCanvasElement) {
         height: canvas.height(),
         camera_zoom: 1.0,
         camera_position: (0.0, 0.0),
+        last_mouse_pos: None,
+        zoom_transform: (0.0, 0.0),
     };
     let (tx, rx) = mpsc::unbounded::<MpscMessage>();
     register_event_handlers(canvas, tx.clone());

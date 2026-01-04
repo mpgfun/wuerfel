@@ -7,6 +7,7 @@ mod zoom_handler;
 
 const MIN_ZOOM: f64 = 0.5;
 const MAX_ZOOM: f64 = 3.0;
+const ZOOM_STEP: f64 = 0.1;
 
 #[derive(Clone)]
 pub struct RenderingInfo {
@@ -15,7 +16,9 @@ pub struct RenderingInfo {
     pub width: u32,
     pub height: u32,
     pub camera_zoom: f64,
+    pub zoom_transform: (f64, f64),
     pub camera_position: (f64, f64),
+    pub last_mouse_pos: Option<(f64, f64)>,
 }
 
 pub fn render(info: &RenderingInfo, state: &ClientState) {
@@ -91,12 +94,17 @@ fn draw_game(info: &RenderingInfo, game: &ClientGame, _state: &ClientState) {
 
 pub fn update_zoom(info: &mut RenderingInfo, delta: f64) {
     if delta < 0.0 {
-        if info.camera_zoom > MIN_ZOOM {
-            info.camera_zoom -= 0.1;
+        if info.camera_zoom <= MIN_ZOOM {
+            return;
         }
+        info.camera_zoom -= ZOOM_STEP;
     } else if delta > 0.0 {
-        if info.camera_zoom < MAX_ZOOM {
-            info.camera_zoom += 0.1;
+        if info.camera_zoom >= MAX_ZOOM {
+            return;
         }
+        info.camera_zoom += ZOOM_STEP;
+    }
+    if let Some(last_mouse_pos) = info.last_mouse_pos {
+        info.zoom_transform = last_mouse_pos;
     }
 }
