@@ -116,6 +116,7 @@ fn start_render_loop(tx: UnboundedSender<MpscMessage>) {
 
 fn register_event_handlers(canvas: HtmlCanvasElement, tx: UnboundedSender<MpscMessage>) {
     let onwheel = Closure::wrap(Box::new(move |e: WheelEvent| {
+        e.prevent_default();
         let _ = tx.unbounded_send(MpscMessage::Scrolling(e.delta_y()));
     }) as Box<dyn FnMut(WheelEvent)>);
     canvas.set_onwheel(Some(onwheel.as_ref().unchecked_ref()));
