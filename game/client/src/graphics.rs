@@ -74,7 +74,7 @@ fn draw_loading_screen(info: &RenderingInfo) {
 fn draw_game(info: &RenderingInfo, game: &ClientGame, _state: &ClientState) {
     transform_zoom(&info);
     background(&info, "#ffffff");
-    let square_size = info.width / game.data.map_config.size_x;
+    let square_size = info.width as f64 / game.data.map_config.size_x as f64;
     for (pos, square) in &game.data.snapshot.squares {
         let color = match game.data.snapshot.players.get(&square.owner) {
             Some(player_data) => player_data.1.clone(),
@@ -82,8 +82,8 @@ fn draw_game(info: &RenderingInfo, game: &ClientGame, _state: &ClientState) {
         };
         info.ctx.set_fill_style_str(color.as_str());
         info.ctx.fill_rect(
-            (square_size * pos.x) as f64,
-            (square_size * pos.y) as f64,
+            square_size * pos.x as f64,
+            square_size * pos.y as f64,
             square_size as f64,
             square_size as f64,
         );
