@@ -20,6 +20,7 @@ pub enum ServerCommand {
     Stop,
     /// Box<T> due to large size
     AddPlayer(Box<WebSocket>),
+    RemovePlayer(PlayerID),
 }
 
 type Squares = HashMap<Position, Square>;
@@ -64,22 +65,19 @@ impl GameState {
             ServerCommand::AddPlayer(ws) => {
                 self.add_player(ws).await;
             }
+            ServerCommand::RemovePlayer(id) => {
+                self.remove_player(id).await;
+            }
         }
         ControlFlow::Continue(())
     }
 
     async fn tick(&mut self) {
         self.apply_clicks();
-        let square_changes = &mut self.square_changes;
-        let _ = Self::broadcast(
-            &mut self.players,
-            Message::text(
-                serde_json::to_string(&TickS2CMessage {
-                    changes: square_changes.drain().collect(),
-                })
-                .unwrap(),
-            ),
-        )
+        let changes = self.square_changes.drain().collect();
+        self.try_broadcast(Message::text(
+            serde_json::to_string(&TickS2CMessage { changes }).unwrap(),
+        ))
         .await;
     }
 
@@ -219,29 +217,30 @@ impl GameState {
         .await
         .unwrap();
 
-        Self::broadcast(
-            &mut self.players,
-            Message::text(
-                serde_json::to_string(&PlayerJoinS2CMessage {
-                    player_join: (player.id, color),
-                })
-                .unwrap(),
-            ),
-        )
-        .await
-        .unwrap();
+        self.try_broadcast(Message::text(
+            serde_json::to_string(&PlayerJoinS2CMessage {
+                player_join: (player.id, color),
+            })
+            .unwrap(),
+        ))
+        .await;
 
+        let tx_clone2 = self.tx.clone();
         tokio::spawn(async move {
+            let id = player.id;
             let disconnect_reason = player.handle_connection(tx_clone).await;
             if let Err(reason) = disconnect_reason {
                 println!("Player disconnected: {:?}", reason);
+                let _ = tx_clone2.send(ServerCommand::RemovePlayer(id)).await;
             }
         })
     }
 
-    /// Returns `Err` if either a JoinError occurred, or if a SendError occurred
-    async fn broadcast(players: &mut Players, message: Message) -> Result<(), ()> {
-        let mut tasks: Vec<JoinHandle<Option<PlayerID>>> = Vec::new();
+    /// Returns either `Ok` or a list of player's ids to remove (because sending the message to their mpsc channel failed, which usually happens when they disconnected)
+    /// # Panics
+    /// If a `JoinError` occurs. This function joins futures to broadcast the message to all players simultaneously instead of one after the other.
+    async fn broadcast(players: &mut Players, message: Message) -> Result<(), Vec<PlayerID>> {
+        let mut tasks: Vec<JoinHandle<Result<(), PlayerID>>> = Vec::new();
 
         // tokio::spawn allows running all send()s concurrently here
         for player in &mut *players {
@@ -250,25 +249,58 @@ impl GameState {
             let id = *player.0;
             tasks.push(tokio::spawn(async move {
                 if tx.send(PlayerCommand::SendMessage(message)).await.is_err() {
-                    Some(id)
+                    Err(id)
                 } else {
-                    None
+                    Ok(())
                 }
             }));
         }
-
+        let mut players_to_remove = Vec::new();
         for task in tasks {
             match task.await {
                 Ok(result) => {
-                    if let Some(id) = result {
+                    if let Err(id) = result {
                         // disconnect player on error
-                        players.remove(&id);
+                        players_to_remove.push(id);
                     }
                 }
-                Err(_) => return Err(()),
+                Err(e) => {
+                    panic!("Error joining asynchronous tasks while broadcasting: {}", e);
+                }
             }
         }
+        if players_to_remove.is_empty() {
+            Ok(())
+        } else {
+            Err(players_to_remove)
+        }
+    }
 
-        Ok(())
+    async fn remove_player(&mut self, id: PlayerID) {
+        if let Some(player) = self.players.get(&id) {
+            // If the receiver has hung up already, that's fine
+            let _ = player.1.send(PlayerCommand::Close).await;
+        }
+        self.players.remove(&id);
+        self.squares.retain(|k, v| {
+            if v.owner == id {
+                self.square_changes
+                    .insert(*k, SquareChange::create_removed());
+                false
+            } else {
+                true
+            }
+        });
+    }
+
+    /// Runs `broadcast()` and also removes the players if errors occur
+    /// # Panics
+    /// Has the same panics as [`Self::broadcast`]
+    async fn try_broadcast(&mut self, message: Message) {
+        if let Err(players_to_remove) = Self::broadcast(&mut self.players, message).await {
+            for id in players_to_remove {
+                self.remove_player(id).await;
+            }
+        }
     }
 }

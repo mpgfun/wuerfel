@@ -11,14 +11,14 @@ use crate::{
 };
 
 pub enum PlayerCommand {
-    #[allow(unused)]
-    Disconnect,
+    Close,
     SendMessage(Message),
 }
 
 #[derive(Debug)]
 pub enum PlayerDisconnectReason {
-    Disconnected,
+    Unknown,
+    Closed,
     #[allow(unused)]
     WarpError(warp::Error),
     InvalidData,
@@ -51,7 +51,7 @@ impl Player {
             tokio::select! {
                 Some(player_command) = self.rx.recv() => {
                     match player_command {
-                        PlayerCommand::Disconnect => return Err(PlayerDisconnectReason::Disconnected),
+                        PlayerCommand::Close => return Err(PlayerDisconnectReason::Closed),
                         PlayerCommand::SendMessage(msg) => {
                             let result = self.try_send_message(msg).await;
                             if let Err(e) = result {
@@ -88,7 +88,7 @@ impl Player {
             }
         }
 
-        Err(PlayerDisconnectReason::Disconnected)
+        Err(PlayerDisconnectReason::Unknown)
     }
 
     async fn try_send_message(&mut self, msg: Message) -> Result<(), PlayerDisconnectReason> {
