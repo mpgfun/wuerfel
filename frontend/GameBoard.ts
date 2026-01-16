@@ -13,8 +13,8 @@ export interface Square {
 export class GameBoard {
     private canvas: HTMLCanvasElement;
     private ctx: CanvasRenderingContext2D;
-    private boardSize: number;
-    private squareSize: number;
+    public boardSize: number;
+    public squareSize: number;
     public offsetX: number;
     public offsetY: number;
     public scale: number;
@@ -23,15 +23,20 @@ export class GameBoard {
         pos: Position,
         square: Square,
     }[];
+    public players: {
+        id: number,
+        color: [number, number, number],
+    }[];
     private isDragging: boolean;
     private dragStartX: number | undefined;
     private dragStartY: number | undefined;
+    public myID: number | undefined;
 
-    constructor(canvas: HTMLCanvasElement, boardSize: number, squareSize: number) {
+    constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d')!;
-        this.boardSize = boardSize;
-        this.squareSize = squareSize;
+        this.boardSize = 100;
+        this.squareSize = 100;
         this.offsetX = 0;
         this.offsetY = 0;
         this.scale = 1;
@@ -40,6 +45,8 @@ export class GameBoard {
         this.dragStartY = undefined;
         this.isDragging = false;
         this.squares = [];
+        this.players = [];
+        this.myID = undefined;
 
         this.setupEventListeners();
     }

@@ -6,9 +6,7 @@ canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 document.body.appendChild(canvas);
 
-const boardSize = 1000;
-const squareSize = 50;
-export const gameBoard = new GameBoard(canvas, boardSize, squareSize);
+export const gameBoard = new GameBoard(canvas);
 
 const socketManager = new WebSocketManager('ws://localhost:3000/ws');
 
@@ -16,6 +14,9 @@ canvas.addEventListener('click', (event) => {
     const rect = canvas.getBoundingClientRect();
     const clickX = (event.clientX - rect.left) / gameBoard.scale + gameBoard.offsetX;
     const clickY = (event.clientY - rect.top) / gameBoard.scale + gameBoard.offsetY;
+
+    let squareSize = gameBoard.squareSize;
+    let boardSize = gameBoard.boardSize;
 
     const boardX = Math.floor(clickX / squareSize);
     const boardY = Math.floor(clickY / squareSize);
