@@ -26,14 +26,14 @@ pub enum PlayerDisconnectReason {
 }
 
 pub struct Player {
-    socket_tx: SplitSink<warp::ws::WebSocket, warp::ws::Message>,
-    socket_rx: SplitStream<warp::ws::WebSocket>,
+    socket_tx: SplitSink<Box<warp::ws::WebSocket>, warp::ws::Message>,
+    socket_rx: SplitStream<Box<warp::ws::WebSocket>>,
     pub id: PlayerID,
     rx: tokio::sync::mpsc::Receiver<PlayerCommand>,
 }
 
 impl Player {
-    pub fn new(ws: WebSocket, rx: tokio::sync::mpsc::Receiver<PlayerCommand>) -> Self {
+    pub fn new(ws: Box<WebSocket>, rx: tokio::sync::mpsc::Receiver<PlayerCommand>) -> Self {
         let (socket_tx, socket_rx) = ws.split();
         Self {
             socket_tx,
@@ -95,7 +95,7 @@ impl Player {
         self.socket_tx
             .send(msg)
             .await
-            .map_err(|e| PlayerDisconnectReason::WarpError(e))
+            .map_err(PlayerDisconnectReason::WarpError)
     }
 }
 

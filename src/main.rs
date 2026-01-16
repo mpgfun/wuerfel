@@ -9,7 +9,7 @@ mod game;
 mod schemas;
 
 async fn handle_ws(sender: ServerSender, ws: warp::ws::WebSocket) {
-    if let Err(e) = sender.send(ServerCommand::AddPlayer(ws)).await {
+    if let Err(e) = sender.send(ServerCommand::AddPlayer(Box::new(ws))).await {
         panic!("Error sending ServerCommand: {}", e);
     }
 }
@@ -34,7 +34,7 @@ async fn main() {
         let tps = game_state.tps as u64;
         let cloned_tx = cloned_tx.clone();
         loop {
-            if let Err(_) = cloned_tx.send(ServerCommand::Tick).await {
+            if cloned_tx.send(ServerCommand::Tick).await.is_err() {
                 break;
             }
             sleep(Duration::from_millis(1000 / tps)).await;

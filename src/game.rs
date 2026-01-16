@@ -18,7 +18,8 @@ pub enum ServerCommand {
     Tick,
     #[allow(unused)]
     Stop,
-    AddPlayer(WebSocket),
+    /// Box<T> due to large size
+    AddPlayer(Box<WebSocket>),
 }
 
 type Squares = HashMap<Position, Square>;
@@ -86,7 +87,6 @@ impl GameState {
         for click in self.click_queue.drain(..) {
             Self::apply_click(
                 &mut self.squares,
-                &mut self.players,
                 &mut self.square_changes,
                 self.config,
                 click,
@@ -96,7 +96,6 @@ impl GameState {
 
     fn apply_click(
         squares: &mut Squares,
-        players: &mut Players,
         square_changes: &mut SquareChanges,
         config: GameConfig,
         click: (PlayerID, Position),
@@ -116,7 +115,7 @@ impl GameState {
         }
         square.number += 1;
         if square.number > config.max_number {
-            Self::expand_square(squares, players, square_changes, config, click.1);
+            Self::expand_square(squares, square_changes, config, click.1);
         } else {
             square_changes.insert(click.1, (*square).into());
         }
@@ -126,7 +125,6 @@ impl GameState {
     /// If the `pos` has no owner (meaning it isn't present in the `squares` HashMap)
     fn expand_square(
         squares: &mut Squares,
-        players: &mut Players,
         square_changes: &mut SquareChanges,
         config: GameConfig,
         pos: Position,
@@ -144,13 +142,7 @@ impl GameState {
                 adjacent_square.owner = origin_square.owner;
                 adjacent_square.number += 1;
                 if adjacent_square.number > config.max_number {
-                    Self::expand_square(
-                        squares,
-                        players,
-                        square_changes,
-                        config,
-                        adjacent_square_pos,
-                    );
+                    Self::expand_square(squares, square_changes, config, adjacent_square_pos);
                 } else {
                     square_changes.insert(adjacent_square_pos, (*adjacent_square).into());
                 }
@@ -196,7 +188,7 @@ impl GameState {
         vec
     }
 
-    async fn add_player(&mut self, ws: WebSocket) -> JoinHandle<()> {
+    async fn add_player(&mut self, ws: Box<WebSocket>) -> JoinHandle<()> {
         let (tx, rx) = tokio::sync::mpsc::channel(32);
         let player = Player::new(ws, rx);
         let color = generate_random_color();
@@ -257,7 +249,7 @@ impl GameState {
             let tx = player.1.1.clone();
             let id = *player.0;
             tasks.push(tokio::spawn(async move {
-                if let Err(_) = tx.send(PlayerCommand::SendMessage(message)).await {
+                if tx.send(PlayerCommand::SendMessage(message)).await.is_err() {
                     Some(id)
                 } else {
                     None
@@ -267,13 +259,12 @@ impl GameState {
 
         for task in tasks {
             match task.await {
-                Ok(result) => match result {
-                    Some(id) => {
+                Ok(result) => {
+                    if let Some(id) = result {
                         // disconnect player on error
                         players.remove(&id);
                     }
-                    None => {}
-                },
+                }
                 Err(_) => return Err(()),
             }
         }
