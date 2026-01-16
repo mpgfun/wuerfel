@@ -37,6 +37,10 @@ export interface LoginDataS2CMessage {
   snapshot: GameSnapshot;
 }
 
+interface PlayerJoinS2CMessage {
+    player_join: [number, [number, number, number]],
+}
+
 export class WebSocketManager {
   private socket: WebSocket;
 
@@ -81,6 +85,14 @@ export class WebSocketManager {
         gameBoard.myID = loginData.id;
         gameBoard.boardSize = loginData.config.size * 10;
         gameBoard.squareSize = loginData.config.size * 0.05 * 10;
+      } else if (data.player_join !== undefined) {
+        let join = data as PlayerJoinS2CMessage;
+        if (gameBoard.players.findIndex(value => value.id === join.player_join[0]) === -1) {
+            gameBoard.players.push({
+                id: join.player_join[0],
+                color: join.player_join[1],
+            });
+        }
       }
     });
 

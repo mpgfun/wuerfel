@@ -52,7 +52,13 @@ impl Player {
                 Some(player_command) = self.rx.recv() => {
                     match player_command {
                         PlayerCommand::Disconnect => return Err(PlayerDisconnectReason::Disconnected),
-                        PlayerCommand::SendMessage(msg) => self.try_send_message(msg).await?,
+                        PlayerCommand::SendMessage(msg) => {
+                            let result = self.try_send_message(msg).await;
+                            if let Err(e) = result {
+                                let _ = self.socket_rx.reunite(self.socket_tx).unwrap().close().await;
+                                return Err(e);
+                            }
+                        },
                     }
                 },
                 Some(Ok(msg)) = self.socket_rx.next() => {

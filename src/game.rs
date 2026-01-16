@@ -6,8 +6,8 @@ use warp::filters::ws::{Message, WebSocket};
 use crate::{
     game::player::{Player, PlayerCommand, generate_random_color},
     schemas::{
-        Color, GameConfig, LoginDataS2CMessage, PlayerID, Position, Square, SquareChange,
-        TickS2CMessage,
+        Color, GameConfig, LoginDataS2CMessage, PlayerID, PlayerJoinS2CMessage, Position, Square,
+        SquareChange, TickS2CMessage,
     },
 };
 
@@ -61,7 +61,7 @@ impl GameState {
             ServerCommand::Tick => self.tick().await,
             ServerCommand::Stop => return ControlFlow::Break(()),
             ServerCommand::AddPlayer(ws) => {
-                self.add_player(ws);
+                self.add_player(ws).await;
             }
         }
         ControlFlow::Continue(())
@@ -196,7 +196,7 @@ impl GameState {
         vec
     }
 
-    fn add_player(&mut self, ws: WebSocket) -> JoinHandle<()> {
+    async fn add_player(&mut self, ws: WebSocket) -> JoinHandle<()> {
         let (tx, rx) = tokio::sync::mpsc::channel(32);
         let player = Player::new(ws, rx);
         let color = generate_random_color();
@@ -205,29 +205,39 @@ impl GameState {
         let config = self.config;
         let squares_clone = self.squares.clone();
         let players_clone = self.players.clone();
-        tokio::spawn(async move {
-            tx.send(PlayerCommand::SendMessage(Message::text(
-                serde_json::to_string(&LoginDataS2CMessage {
-                    id: player.id,
-                    color,
-                    spawn_point: crate::schemas::Position { x: 0, y: 0 },
-                    snapshot: crate::schemas::GameSnapshot {
-                        players: players_clone
-                            .iter()
-                            .map(|elem| (*elem.0, elem.1.0))
-                            .collect(),
-                        squares: squares_clone
-                            .iter()
-                            .map(|elem| (*elem.0, *elem.1))
-                            .collect(),
-                    },
-                    config,
+        tx.send(PlayerCommand::SendMessage(Message::text(
+            serde_json::to_string(&LoginDataS2CMessage {
+                id: player.id,
+                color,
+                spawn_point: crate::schemas::Position { x: 0, y: 0 },
+                snapshot: crate::schemas::GameSnapshot {
+                    players: players_clone
+                        .iter()
+                        .map(|elem| (*elem.0, elem.1.0))
+                        .collect(),
+                    squares: squares_clone
+                        .iter()
+                        .map(|elem| (*elem.0, *elem.1))
+                        .collect(),
+                },
+                config,
+            })
+            .unwrap(),
+        )))
+        .await
+        .unwrap();
+
+        Self::broadcast(
+            &mut self.players,
+            Message::text(
+                serde_json::to_string(&PlayerJoinS2CMessage {
+                    player_join: (player.id, color),
                 })
                 .unwrap(),
-            )))
-            .await
-            .unwrap();
-        });
+            ),
+        )
+        .await
+        .unwrap();
 
         tokio::spawn(async move {
             let disconnect_reason = player.handle_connection(tx_clone).await;
@@ -239,22 +249,30 @@ impl GameState {
 
     /// Returns `Err` if either a JoinError occurred, or if a SendError occurred
     async fn broadcast(players: &mut Players, message: Message) -> Result<(), ()> {
-        let mut tasks = Vec::new();
+        let mut tasks: Vec<JoinHandle<Option<PlayerID>>> = Vec::new();
 
         // tokio::spawn allows running all send()s concurrently here
-        for tx in players.values() {
+        for player in &mut *players {
             let message = message.clone();
-            let tx = tx.1.clone();
+            let tx = player.1.1.clone();
+            let id = *player.0;
             tasks.push(tokio::spawn(async move {
-                tx.send(PlayerCommand::SendMessage(message)).await
+                if let Err(_) = tx.send(PlayerCommand::SendMessage(message)).await {
+                    Some(id)
+                } else {
+                    None
+                }
             }));
         }
 
         for task in tasks {
             match task.await {
                 Ok(result) => match result {
-                    Ok(()) => {}
-                    Err(_) => return Err(()),
+                    Some(id) => {
+                        // disconnect player on error
+                        players.remove(&id);
+                    }
+                    None => {}
                 },
                 Err(_) => return Err(()),
             }

@@ -72,3 +72,8 @@ impl SquareChange {
 pub struct TickS2CMessage {
     pub changes: Vec<(Position, SquareChange)>,
 }
+
+#[derive(Serialize)]
+pub struct PlayerJoinS2CMessage {
+    pub player_join: (PlayerID, Color),
+}
