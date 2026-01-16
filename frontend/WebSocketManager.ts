@@ -16,6 +16,24 @@ export type SquareChange = [Position, {
     number: number,
 }];
 
+export interface GameConfig {
+    size: number,
+    max_number: number,
+}
+
+export interface GameSnapshot {
+    players: [number, [number, number, number]][],
+    squares: [Position, number][],
+}
+
+export interface LoginDataS2CMessage {
+    id: number,
+    color: [number, number, number],
+    spawn_point: Position,
+    config: GameConfig,
+    snapshot: GameSnapshot,
+}
+
 export class WebSocketManager {
     private socket: WebSocket;
 
@@ -27,7 +45,6 @@ export class WebSocketManager {
         });
 
         this.socket.addEventListener('message', (event) => {
-            // console.log(event.data);
             let data;
             try {
                 data = JSON.parse(event.data);
@@ -41,6 +58,9 @@ export class WebSocketManager {
                     return;
                 }
                 gameBoard.onChanges(changes);
+            } else if (data.id !== undefined) {
+                const loginData = data as LoginDataS2CMessage;
+                // TODO
             }
         });
 

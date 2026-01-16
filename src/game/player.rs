@@ -54,8 +54,8 @@ impl Player {
             color: [255, 0, 0],
             spawn_point: crate::schemas::Position { x: 0, y: 0 },
             snapshot: crate::schemas::GameSnapshot {
-                players: vec![], // this will be implemented later
-                squares: vec![], // this will be implemented later
+                players: vec![], // TODO
+                squares: vec![], // TODO
             },
             config,
         })
