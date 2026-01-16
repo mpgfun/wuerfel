@@ -5,7 +5,9 @@ use warp::filters::ws::{Message, WebSocket};
 
 use crate::{
     game::player::{Player, PlayerCommand},
-    schemas::{GameConfig, PlayerID, Position, Square, SquareChange, TickS2CMessage},
+    schemas::{
+        GameConfig, LoginDataS2CMessage, PlayerID, Position, Square, SquareChange, TickS2CMessage,
+    },
 };
 
 mod player;
@@ -19,12 +21,12 @@ pub enum ServerCommand {
 }
 
 type Squares = HashMap<Position, Square>;
-type Players = HashMap<PlayerID, tokio::sync::mpsc::Sender<PlayerCommand>>;
+type Players = HashMap<PlayerID, ([u8; 3], tokio::sync::mpsc::Sender<PlayerCommand>)>;
 pub type ServerSender = tokio::sync::mpsc::Sender<ServerCommand>;
 pub type SquareChanges = HashMap<Position, SquareChange>;
 
 pub struct GameState {
-    players: HashMap<PlayerID, tokio::sync::mpsc::Sender<PlayerCommand>>,
+    players: Players,
     squares: Squares,
     config: GameConfig,
     pub rx: tokio::sync::mpsc::Receiver<ServerCommand>,
@@ -196,11 +198,37 @@ impl GameState {
     fn add_player(&mut self, ws: WebSocket) -> JoinHandle<()> {
         let (tx, rx) = tokio::sync::mpsc::channel(32);
         let player = Player::new(ws, rx);
-        self.players.insert(player.id, tx);
+        self.players.insert(player.id, ([255, 0, 0], tx.clone()));
         let tx_clone = self.tx.clone();
         let config = self.config;
+        let squares_clone = self.squares.clone();
+        let players_clone = self.players.clone();
         tokio::spawn(async move {
-            let disconnect_reason = player.handle_connection(tx_clone, config).await;
+            tx.send(PlayerCommand::SendMessage(Message::text(
+                serde_json::to_string(&LoginDataS2CMessage {
+                    id: player.id,
+                    color: [255, 0, 0],
+                    spawn_point: crate::schemas::Position { x: 0, y: 0 },
+                    snapshot: crate::schemas::GameSnapshot {
+                        players: players_clone
+                            .iter()
+                            .map(|elem| (*elem.0, elem.1.0))
+                            .collect(),
+                        squares: squares_clone
+                            .iter()
+                            .map(|elem| (*elem.0, *elem.1))
+                            .collect(),
+                    },
+                    config,
+                })
+                .unwrap(),
+            )))
+            .await
+            .unwrap();
+        });
+
+        tokio::spawn(async move {
+            let disconnect_reason = player.handle_connection(tx_clone).await;
             if let Err(reason) = disconnect_reason {
                 println!("Player disconnected: {:?}", reason);
             }
@@ -214,7 +242,7 @@ impl GameState {
         // tokio::spawn allows running all send()s concurrently here
         for tx in players.values() {
             let message = message.clone();
-            let tx = tx.clone();
+            let tx = tx.1.clone();
             tasks.push(tokio::spawn(async move {
                 tx.send(PlayerCommand::SendMessage(message)).await
             }));

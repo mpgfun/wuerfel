@@ -2,13 +2,12 @@ use futures_util::{
     SinkExt, StreamExt,
     stream::{SplitSink, SplitStream},
 };
-use serde::Serialize;
 use serde_json::Value;
 use warp::filters::ws::{Message, WebSocket};
 
 use crate::{
     game::ServerCommand,
-    schemas::{ClickC2SMessage, GameConfig, LoginDataS2CMessage, PlayerID},
+    schemas::{ClickC2SMessage, PlayerID},
 };
 
 pub enum PlayerCommand {
@@ -47,20 +46,7 @@ impl Player {
     pub async fn handle_connection(
         mut self,
         tx: tokio::sync::mpsc::Sender<ServerCommand>,
-        config: GameConfig,
     ) -> Result<(), PlayerDisconnectReason> {
-        self.try_send(LoginDataS2CMessage {
-            id: self.id,
-            color: [255, 0, 0],
-            spawn_point: crate::schemas::Position { x: 0, y: 0 },
-            snapshot: crate::schemas::GameSnapshot {
-                players: vec![], // TODO
-                squares: vec![], // TODO
-            },
-            config,
-        })
-        .await?;
-
         loop {
             tokio::select! {
                 Some(player_command) = self.rx.recv() => {
@@ -97,11 +83,6 @@ impl Player {
         }
 
         Err(PlayerDisconnectReason::Disconnected)
-    }
-
-    async fn try_send<T: Serialize>(&mut self, msg: T) -> Result<(), PlayerDisconnectReason> {
-        self.try_send_message(Message::text(serde_json::to_string(&msg).unwrap().as_str()))
-            .await
     }
 
     async fn try_send_message(&mut self, msg: Message) -> Result<(), PlayerDisconnectReason> {

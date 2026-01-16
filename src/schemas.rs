@@ -25,7 +25,7 @@ pub type Color = [u8; 3];
 #[derive(Serialize)]
 pub struct GameSnapshot {
     pub players: Vec<(PlayerID, Color)>,
-    pub squares: Vec<(Position, PlayerID)>,
+    pub squares: Vec<(Position, Square)>,
 }
 
 #[derive(Serialize)]
