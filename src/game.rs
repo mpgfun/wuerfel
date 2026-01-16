@@ -6,8 +6,8 @@ use warp::filters::ws::{Message, WebSocket};
 use crate::{
     game::player::{Player, PlayerCommand, generate_random_color},
     schemas::{
-        Color, GameConfig, LoginDataS2CMessage, PlayerID, PlayerJoinS2CMessage, Position, Square,
-        SquareChange, TickS2CMessage,
+        Color, GameConfig, LoginDataS2CMessage, PlayerID, PlayerJoinS2CMessage,
+        PlayerLeaveS2CMessage, Position, Square, SquareChange, TickS2CMessage,
     },
 };
 
@@ -281,6 +281,11 @@ impl GameState {
             // If the receiver has hung up already, that's fine
             let _ = player.1.send(PlayerCommand::Close).await;
         }
+        let _ = Self::broadcast(
+            &mut self.players,
+            Message::text(serde_json::to_string(&PlayerLeaveS2CMessage { left_id: id }).unwrap()),
+        )
+        .await;
         self.players.remove(&id);
         self.squares.retain(|k, v| {
             if v.owner == id {

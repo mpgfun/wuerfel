@@ -41,6 +41,10 @@ interface PlayerJoinS2CMessage {
     player_join: [number, [number, number, number]],
 }
 
+interface PlayerLeaveS2CMessage {
+  left_id: number;
+}
+
 export class WebSocketManager {
   private socket: WebSocket;
 
@@ -92,6 +96,13 @@ export class WebSocketManager {
                 id: join.player_join[0],
                 color: join.player_join[1],
             });
+        }
+      } else if (data.left_id !== undefined) {
+        const leave_message = data as PlayerLeaveS2CMessage;
+        const id = leave_message.left_id;
+        const index = gameBoard.players.findIndex(value => value.id === id);
+        if (index !== -1) {
+          gameBoard.players.splice(index, 1);
         }
       }
     });

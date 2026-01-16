@@ -77,3 +77,8 @@ pub struct TickS2CMessage {
 pub struct PlayerJoinS2CMessage {
     pub player_join: (PlayerID, Color),
 }
+
+#[derive(Serialize)]
+pub struct PlayerLeaveS2CMessage {
+    pub left_id: PlayerID,
+}
