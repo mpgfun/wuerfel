@@ -7,7 +7,7 @@ use warp::filters::ws::{Message, WebSocket};
 
 use crate::{
     game::ServerCommand,
-    schemas::{ClickC2SMessage, PlayerID},
+    schemas::{ClickC2SMessage, Color, PlayerID},
 };
 
 pub enum PlayerCommand {
@@ -95,4 +95,8 @@ impl Player {
 
 fn generate_id() -> PlayerID {
     rand::random::<PlayerID>()
+}
+
+pub fn generate_random_color() -> Color {
+    (rand::random(), rand::random(), rand::random())
 }

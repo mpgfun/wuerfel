@@ -143,7 +143,13 @@ export class GameBoard {
                     square = squareMatch[0];
                 }
                 if (square) {
-                    this.ctx.fillStyle = '#e74c3c';
+                    let owner = square.square.owner;
+                    let ownerColor = this.players.find(player => player.id === owner)?.color;
+                    if (ownerColor === undefined) {
+                        console.error("Out of sync!");
+                        continue;
+                    }
+                    this.ctx.fillStyle = `rgb(${ownerColor[0]}, ${ownerColor[1]}, ${ownerColor[2]})`;// '#e74c3c';
                     this.ctx.fillRect(x, y, this.squareSize - 2, this.squareSize - 2);
 
                     // Draw the number on top of the square

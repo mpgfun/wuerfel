@@ -4,9 +4,10 @@ use tokio::task::JoinHandle;
 use warp::filters::ws::{Message, WebSocket};
 
 use crate::{
-    game::player::{Player, PlayerCommand},
+    game::player::{Player, PlayerCommand, generate_random_color},
     schemas::{
-        GameConfig, LoginDataS2CMessage, PlayerID, Position, Square, SquareChange, TickS2CMessage,
+        Color, GameConfig, LoginDataS2CMessage, PlayerID, Position, Square, SquareChange,
+        TickS2CMessage,
     },
 };
 
@@ -21,7 +22,7 @@ pub enum ServerCommand {
 }
 
 type Squares = HashMap<Position, Square>;
-type Players = HashMap<PlayerID, ([u8; 3], tokio::sync::mpsc::Sender<PlayerCommand>)>;
+type Players = HashMap<PlayerID, (Color, tokio::sync::mpsc::Sender<PlayerCommand>)>;
 pub type ServerSender = tokio::sync::mpsc::Sender<ServerCommand>;
 pub type SquareChanges = HashMap<Position, SquareChange>;
 
@@ -198,7 +199,8 @@ impl GameState {
     fn add_player(&mut self, ws: WebSocket) -> JoinHandle<()> {
         let (tx, rx) = tokio::sync::mpsc::channel(32);
         let player = Player::new(ws, rx);
-        self.players.insert(player.id, ([255, 0, 0], tx.clone()));
+        let color = generate_random_color();
+        self.players.insert(player.id, (color, tx.clone()));
         let tx_clone = self.tx.clone();
         let config = self.config;
         let squares_clone = self.squares.clone();
@@ -207,7 +209,7 @@ impl GameState {
             tx.send(PlayerCommand::SendMessage(Message::text(
                 serde_json::to_string(&LoginDataS2CMessage {
                     id: player.id,
-                    color: [255, 0, 0],
+                    color,
                     spawn_point: crate::schemas::Position { x: 0, y: 0 },
                     snapshot: crate::schemas::GameSnapshot {
                         players: players_clone

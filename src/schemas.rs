@@ -20,7 +20,7 @@ pub struct GameConfig {
 
 pub type PlayerID = u16;
 
-pub type Color = [u8; 3];
+pub type Color = (u8, u8, u8);
 
 #[derive(Serialize)]
 pub struct GameSnapshot {
