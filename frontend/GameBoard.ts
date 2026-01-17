@@ -38,7 +38,7 @@ export class GameBoard {
         this.squareSize = 0;
         this.offsetX = 0;
         this.offsetY = 0;
-        this.scale = 1;
+        this.scale = 10;
         this.dragStartX = undefined;
         this.dragStartY = undefined;
         this.isDragging = false;
@@ -87,11 +87,11 @@ export class GameBoard {
         const mouseX = (event.clientX - rect.left) / this.scale + this.offsetX;
         const mouseY = (event.clientY - rect.top) / this.scale + this.offsetY;
 
-        const zoom = event.deltaY < 0 ? 1 + zoomIntensity : 1 - zoomIntensity;
+        let zoom = event.deltaY < 0 ? 1 + zoomIntensity : 1 - zoomIntensity;
 
         const newScale = this.scale * zoom;
 
-        if (newScale < 0.5 || newScale > 3) return;
+        if (newScale < 5 || newScale > 10) return;
 
         this.offsetX = mouseX - (mouseX - this.offsetX) * zoom;
         this.offsetY = mouseY - (mouseY - this.offsetY) * zoom;
@@ -105,6 +105,7 @@ export class GameBoard {
         this.ctx.save();
         this.ctx.scale(this.scale, this.scale);
         this.ctx.translate(-this.offsetX, -this.offsetY);
+
 
         let borders = 1 / this.scale;
 
