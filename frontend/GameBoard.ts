@@ -18,7 +18,6 @@ export class GameBoard {
     public offsetX: number;
     public offsetY: number;
     public scale: number;
-    private clickedSquares: Set<string>;
     public squares: {
         pos: Position,
         square: Square,
@@ -35,12 +34,11 @@ export class GameBoard {
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d')!;
-        this.boardSize = 100;
-        this.squareSize = 100;
+        this.boardSize = 0;
+        this.squareSize = 0;
         this.offsetX = 0;
         this.offsetY = 0;
         this.scale = 1;
-        this.clickedSquares = new Set();
         this.dragStartX = undefined;
         this.dragStartY = undefined;
         this.isDragging = false;
@@ -57,7 +55,6 @@ export class GameBoard {
         this.canvas.addEventListener('mouseup', this.onMouseUp.bind(this));
         this.canvas.addEventListener('mouseleave', this.onMouseUp.bind(this));
         this.canvas.addEventListener('wheel', this.onWheel.bind(this));
-        this.canvas.addEventListener('click', this.onClick.bind(this));
     }
 
     private onMouseDown(event: MouseEvent) {
@@ -103,37 +100,18 @@ export class GameBoard {
         this.drawBoard();
     }
 
-    private onClick(event: MouseEvent) {
-        const rect = this.canvas.getBoundingClientRect();
-        const clickX = (event.clientX - rect.left) / this.scale + this.offsetX;
-        const clickY = (event.clientY - rect.top) / this.scale + this.offsetY;
-
-        const boardX = Math.floor(clickX / this.squareSize);
-        const boardY = Math.floor(clickY / this.squareSize);
-
-        if (boardX >= 0 && boardY >= 0 && boardX < this.boardSize / this.squareSize && boardY < this.boardSize / this.squareSize) {
-            const squareKey = `${boardX},${boardY}`;
-
-            if (this.clickedSquares.has(squareKey)) {
-                this.clickedSquares.delete(squareKey);
-            } else {
-                this.clickedSquares.add(squareKey);
-            }
-
-            this.drawBoard();
-        }
-    }
-
     public drawBoard() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.ctx.save();
         this.ctx.scale(this.scale, this.scale);
         this.ctx.translate(-this.offsetX, -this.offsetY);
 
-        for (let x = 0; x < this.boardSize; x += this.squareSize) {
-            for (let y = 0; y < this.boardSize; y += this.squareSize) {
-                const boardX = x / this.squareSize;
-                const boardY = y / this.squareSize;
+        let borders = 1 / this.scale;
+
+        for (let boardX = 0; boardX < this.boardSize; boardX++) {
+            for (let boardY = 0; boardY < this.boardSize; boardY++) {
+                const x = boardX * this.squareSize;
+                const y = boardY * this.squareSize;
 
                 const squareMatch = this.squares.filter((value) => value.pos.x === boardX && value.pos.y === boardY);
                 let square: {pos: Position, square: Square} | undefined;
@@ -143,6 +121,7 @@ export class GameBoard {
                     square = squareMatch[0];
                 }
                 if (square) {
+                    console.log("drawing square");
                     let owner = square.square.owner;
                     let ownerColor = this.players.find(player => player.id === owner)?.color;
                     if (ownerColor === undefined) {
@@ -150,9 +129,8 @@ export class GameBoard {
                         continue;
                     }
                     this.ctx.fillStyle = `rgb(${ownerColor[0]}, ${ownerColor[1]}, ${ownerColor[2]})`;// '#e74c3c';
-                    this.ctx.fillRect(x, y, this.squareSize - 2, this.squareSize - 2);
+                    this.ctx.fillRect(x + borders, y + borders, this.squareSize - borders, this.squareSize - borders);
 
-                    // Draw the number on top of the square
                     this.ctx.fillStyle = '#ffffff';
                     this.ctx.font = `${this.squareSize / 2}px Arial`;
                     this.ctx.textAlign = 'center';
@@ -164,7 +142,7 @@ export class GameBoard {
                     );
                 } else {
                     this.ctx.fillStyle = '#3498db';
-                    this.ctx.fillRect(x, y, this.squareSize - 2, this.squareSize - 2);
+                    this.ctx.fillRect(x + borders, y + borders, this.squareSize - borders, this.squareSize - borders);
                 }
             }
         }
@@ -203,5 +181,7 @@ export class GameBoard {
         }
         console.log("squares:");
         console.log(this.squares);
+        console.log("players:")
+        console.log(this.players);
     }
 }

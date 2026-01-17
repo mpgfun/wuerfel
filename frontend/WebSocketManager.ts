@@ -87,8 +87,8 @@ export class WebSocketManager {
           };
         });
         gameBoard.myID = loginData.id;
-        gameBoard.boardSize = loginData.config.size * 10;
-        gameBoard.squareSize = loginData.config.size * 0.05 * 10;
+        gameBoard.boardSize = loginData.config.size;
+        gameBoard.squareSize = 1 / loginData.config.size * 100;
       } else if (data.player_join !== undefined) {
         let join = data as PlayerJoinS2CMessage;
         if (gameBoard.players.findIndex(value => value.id === join.player_join[0]) === -1) {

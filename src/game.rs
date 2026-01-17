@@ -50,7 +50,7 @@ impl GameState {
             tps: 60,
             click_queue: Vec::with_capacity(64),
             config: GameConfig {
-                size: 100,
+                size: 20,
                 max_number: 4,
             },
             square_changes: SquareChanges::new(),
@@ -99,13 +99,6 @@ impl GameState {
         click: (PlayerID, Position),
     ) {
         let Some(square) = squares.get_mut(&click.1) else {
-            squares.insert(
-                click.1,
-                Square {
-                    owner: click.0,
-                    number: 1,
-                },
-            );
             return;
         };
         if square.owner != click.0 {
@@ -186,9 +179,13 @@ impl GameState {
         vec
     }
 
-    async fn add_player(&mut self, ws: Box<WebSocket>) -> JoinHandle<()> {
+    async fn add_player(&mut self, ws: Box<WebSocket>) -> Option<JoinHandle<()>> {
         let (tx, rx) = tokio::sync::mpsc::channel(32);
         let player = Player::new(ws, rx);
+        let control_flow = self.create_first_square_for_player(player.id);
+        if control_flow.is_break() {
+            return None;
+        }
         let color = generate_random_color();
         self.players.insert(player.id, (color, tx.clone()));
         let tx_clone = self.tx.clone();
@@ -226,14 +223,47 @@ impl GameState {
         .await;
 
         let tx_clone2 = self.tx.clone();
-        tokio::spawn(async move {
+        Some(tokio::spawn(async move {
             let id = player.id;
             let disconnect_reason = player.handle_connection(tx_clone).await;
             if let Err(reason) = disconnect_reason {
                 println!("Player disconnected: {:?}", reason);
                 let _ = tx_clone2.send(ServerCommand::RemovePlayer(id)).await;
             }
-        })
+        }))
+    }
+
+    fn create_first_square_for_player(&mut self, id: PlayerID) -> ControlFlow<()> {
+        let mut unsuccessful_searches = 0;
+        loop {
+            let (x, y) = (
+                rand::random_range(0..self.config.size),
+                rand::random_range(0..self.config.size),
+            );
+            let pos = Position { x, y };
+            if self.squares.contains_key(&pos) {
+                unsuccessful_searches += 1;
+                if unsuccessful_searches > 100 {
+                    break ControlFlow::Break(());
+                }
+                continue;
+            }
+            self.squares.insert(
+                pos,
+                Square {
+                    owner: id,
+                    number: 1,
+                },
+            );
+            self.square_changes.insert(
+                pos,
+                SquareChange {
+                    id: Some(id),
+                    number: 1,
+                },
+            );
+            break ControlFlow::Continue(());
+        }
     }
 
     /// Returns either `Ok` or a list of player's ids to remove (because sending the message to their mpsc channel failed, which usually happens when they disconnected)

@@ -21,10 +21,12 @@ canvas.addEventListener('click', (event) => {
     const boardX = Math.floor(clickX / squareSize);
     const boardY = Math.floor(clickY / squareSize);
 
-    if (boardX >= 0 && boardY >= 0 && boardX < boardSize / squareSize && boardY < boardSize / squareSize) {
+    console.log("pos: " + boardX + " " + boardY);
+    if (boardX >= 0 && boardY >= 0 && boardX < boardSize && boardY < boardSize) {
         const data = {
             position: { x: boardX, y: boardY },
         };
+
 
         socketManager.sendMessage({
             type: "click",
