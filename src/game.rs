@@ -74,11 +74,12 @@ impl GameState {
 
     async fn tick(&mut self) {
         self.apply_clicks();
-        let changes = self.square_changes.drain().collect();
-        self.try_broadcast(Message::text(
-            serde_json::to_string(&TickS2CMessage { changes }).unwrap(),
-        ))
-        .await;
+        let changes = self.square_changes.drain().collect::<Vec<_>>();
+        if !changes.is_empty() {
+            self.try_broadcast(Message::text(
+                serde_json::to_string(&TickS2CMessage { changes }).unwrap(),
+            )).await;
+        }
     }
 
     fn apply_clicks(&mut self) {
