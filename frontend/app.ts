@@ -13,7 +13,7 @@ document.body.appendChild(canvas);
 
 export const gameBoard = new GameBoard(canvas);
 
-const socketManager = new WebSocketManager('ws://localhost:3000/ws');
+const socketManager = new WebSocketManager('/ws');
 
 canvas.addEventListener('click', (event) => {
     const rect = canvas.getBoundingClientRect();
