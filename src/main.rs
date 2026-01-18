@@ -49,8 +49,8 @@ async fn main() {
         }
     });
 
-    let port = fs::read_to_string("port").unwrap_or(String::from("3000"));
-    let port = port.parse::<u16>().unwrap_or(3000);
+    let port = fs::read_to_string("port").unwrap_or(String::from("3002"));
+    let port = port.parse::<u16>().unwrap_or(3002);
 
     println!("Live on http://127.0.0.1:{}", port);
     warp::serve(routes).run(([127, 0, 0, 1], port)).await;
