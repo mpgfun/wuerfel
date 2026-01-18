@@ -47,6 +47,7 @@ export class GameBoard {
         this.myID = undefined;
 
         this.setupEventListeners();
+        this.resizeCanvas();
     }
 
     private setupEventListeners() {
@@ -184,5 +185,10 @@ export class GameBoard {
         console.log(this.squares);
         console.log("players:")
         console.log(this.players);
+    }
+
+    public resizeCanvas() {
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
     }
 }
