@@ -1,4 +1,4 @@
-use std::{ops::ControlFlow, time::Duration};
+use std::{fs, ops::ControlFlow, time::Duration};
 
 use tokio::time::sleep;
 use warp::Filter;
@@ -49,6 +49,9 @@ async fn main() {
         }
     });
 
-    println!("Live on http://127.0.0.1:3000");
-    warp::serve(routes).run(([127, 0, 0, 1], 3000)).await;
+    let port = fs::read_to_string("port").unwrap_or(String::from("3000"));
+    let port = port.parse::<u16>().unwrap_or(3000);
+
+    println!("Live on http://127.0.0.1:{}", port);
+    warp::serve(routes).run(([127, 0, 0, 1], port)).await;
 }
