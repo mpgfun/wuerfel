@@ -123,7 +123,6 @@ export class GameBoard {
                     square = squareMatch[0];
                 }
                 if (square) {
-                    console.log("drawing square");
                     let owner = square.square.owner;
                     let ownerColor = this.players.find(player => player.id === owner)?.color;
                     if (ownerColor === undefined) {
@@ -153,7 +152,6 @@ export class GameBoard {
     }
 
     public onChanges(changes: SquareChange[]) {
-        console.log("changes received: " + JSON.stringify(changes));
         for (const change of changes) {
             const pos = change[0];
             let index = this.squares.findIndex(value => value.pos.x == pos.x && value.pos.y == pos.y);
@@ -181,10 +179,6 @@ export class GameBoard {
                 }
             }
         }
-        console.log("squares:");
-        console.log(this.squares);
-        console.log("players:")
-        console.log(this.players);
     }
 
     public resizeCanvas() {
