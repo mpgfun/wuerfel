@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "build": "mkdir -p dist && npx esbuild app.ts --bundle --outfile=dist/bundle.js && cp *.html *.css dist/"
+    "build": "mkdir -p dist && npx esbuild app.ts --bundle --outfile=dist/bundle.js && cp *.html *.css *.png dist/"
   },
   "dependencies": {
     "typescript": "^5.9.3",
